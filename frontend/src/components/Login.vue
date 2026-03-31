@@ -47,7 +47,7 @@ const ejecutarLogin = async () => {
   try {
     // 2. DEBES DEFINIR 'response' (ESTO CORRIGE EL REFERENCEERROR)
     // Reemplaza la URL con la de tu API real
-const response = await fetch('http://192.168.1.7:8080/Login', { 
+const response = await fetch('http://192.168.1.7:8080/api/login', { 
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(form.value)
