@@ -1,27 +1,77 @@
 <template>
-  <div class="container">
-    <div class="card">
-      <h1 class="title">VINYL<span class="blue">NET</span></h1>
-      <p class="subtitle">Sistema de Gestión</p>
+  <div class="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-navy-base/60 via-brand-navy-dark to-brand-navy-dark p-6">
+    <div class="w-full max-w-md">
+      <!-- Logo/Brand Section -->
+      <div class="text-center mb-10 space-y-2">
+        <h1 class="text-4xl font-black tracking-tighter text-white">
+          VINYL<span class="text-brand-royal">NET</span>
+        </h1>
+        <p class="text-sm font-medium uppercase tracking-[0.2em] text-neutral-500">
+          Sistema de Gestión v2.0
+        </p>
+      </div>
 
-      <form @submit.prevent="ejecutarLogin" class="form">
-        <div class="group">
-          <label>Usuario</label>
-          <input v-model="form.username" type="text" placeholder="Tu usuario" required />
-        </div>
-
-        <div class="group">
-          <label>Contraseña</label>
-          <div class="password-box">
-            <input v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="••••••••" required />
-            <button type="button" @click="showPassword = !showPassword" class="eye">👁️</button>
+      <!-- Login Card -->
+      <div class="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl p-8 md:p-10">
+        <form @submit.prevent="ejecutarLogin" class="space-y-6">
+          <div class="space-y-2">
+            <label class="text-[10px] font-bold uppercase tracking-widest text-neutral-400 block px-1">
+              Usuario
+            </label>
+            <input 
+              v-model="form.username" 
+              type="text" 
+              placeholder="admin" 
+              required 
+              class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-royal/40 focus:border-brand-royal/50 transition-all duration-300"
+            />
           </div>
+
+          <div class="space-y-2">
+            <label class="text-[10px] font-bold uppercase tracking-widest text-neutral-400 block px-1">
+              Contraseña
+            </label>
+            <div class="relative group">
+              <input 
+                v-model="form.password" 
+                :type="showPassword ? 'text' : 'password'" 
+                placeholder="••••••••" 
+                required 
+                class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-brand-royal/40 focus:border-brand-royal/50 transition-all duration-300"
+              />
+              <button 
+                type="button" 
+                @click="showPassword = !showPassword" 
+                class="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-neutral-500 hover:text-white transition-colors"
+              >
+                <span v-if="showPassword">🙈</span>
+                <span v-else>👁️</span>
+              </button>
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            :disabled="loading"
+            class="w-full group relative flex items-center justify-center bg-brand-royal hover:bg-blue-500 disabled:bg-brand-navy-base disabled:opacity-50 text-white font-bold py-4 rounded-2xl shadow-lg shadow-brand-royal/20 transition-all duration-300 active:scale-[0.98]"
+          >
+            <span v-if="loading" class="flex items-center space-x-2">
+              <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Ingresando...</span>
+            </span>
+            <span v-else>Iniciar sesión</span>
+          </button>
+        </form>
+
+        <div class="mt-8 text-center border-top border-white/5 pt-8">
+           <p class="text-[10px] text-neutral-600 font-medium uppercase tracking-[0.2em]">
+             © 2026 VINYLNET PLATFORM
+           </p>
         </div>
-
-        <button type="submit" class="btn">{{ loading ? 'Ingresando...' : 'Iniciar sesión' }}</button>
-      </form>
-
-      <div class="footer">© 2026 VINYLNET</div>
+      </div>
     </div>
   </div>
 </template>
@@ -29,13 +79,11 @@
 <script setup>
 import { ref } from 'vue';
 
-// 1. Definimos el objeto form (ESTO CORRIGE EL TYPEERROR)
 const form = ref({
   username: '',
   password: ''
 });
 
-// Definimos las otras variables que usas en el template
 const showPassword = ref(false);
 const loading = ref(false);
 
@@ -45,13 +93,11 @@ const ejecutarLogin = async () => {
   loading.value = true;
   
   try {
-    // 2. DEBES DEFINIR 'response' (ESTO CORRIGE EL REFERENCEERROR)
-    // Reemplaza la URL con la de tu API real
-const response = await fetch('http://192.168.1.7:8080/Login', { 
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(form.value)
-});
+    const response = await fetch('http://192.168.1.7:8080/api/login', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form.value)
+    });
 
     if (response.ok) {
       const data = await response.json();
@@ -65,7 +111,6 @@ const response = await fetch('http://192.168.1.7:8080/Login', {
       alert("Credenciales incorrectas");
     }
   } catch (error) {
-    // Aquí es donde caía el error antes
     console.error("Error en el login:", error);
     alert("No se pudo conectar con el servidor");
   } finally {
@@ -73,106 +118,3 @@ const response = await fetch('http://192.168.1.7:8080/Login', {
   }
 }
 </script>
-
-<style scoped>
-.container {
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: linear-gradient(135deg, #0f172a, #1e293b, #020617);
-  padding: 20px;
-}
-
-.card {
-  width: 100%;
-  max-width: 400px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  box-shadow: 0 15px 40px rgba(0,0,0,0.4);
-  overflow: hidden;
-  text-align: center;
-}
-
-.title {
-  font-size: 28px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.blue { color: #2563eb; }
-
-.subtitle {
-  font-size: 12px;
-  color: #64748b;
-  margin-top: 5px;
-  letter-spacing: 1px;
-}
-
-.form {
-  padding: 20px 30px 30px;
-}
-
-.group {
-  margin-bottom: 20px;
-  text-align: left;
-}
-
-.group label {
-  font-size: 11px;
-  font-weight: bold;
-  color: #475569;
-  display: block;
-  margin-bottom: 5px;
-}
-
-input {
-  width: 100%;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid #cbd5f5;
-  background: #f1f5f9;
-  transition: 0.3s;
-}
-
-input:focus {
-  outline: none;
-  border-color: #2563eb;
-  background: white;
-}
-
-.password-box { position: relative; }
-
-.eye {
-  position: absolute;
-  right: 10px;
-  top: 8px;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.btn {
-  width: 100%;
-  padding: 12px;
-  background: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.btn:hover { background: #1d4ed8; }
-
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.footer {
-  text-align: center;
-  font-size: 11px;
-  color: #94a3b8;
-  padding-bottom: 20px;
-}
-</style>
