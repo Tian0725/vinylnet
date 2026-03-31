@@ -1,5 +1,5 @@
 <template>
-  <div class="app-main">
+  <div class="min-h-screen bg-brand-navy-dark font-sans text-neutral-200">
     <LoginComponent v-if="!isAuthenticated" @login-success="entrarAlSistema" />
     <DashboardComponent v-else @logout="salirDelSistema" />
   </div>

@@ -1,5 +1,56 @@
-# Vue 3 + Vite
+# VinylNet Frontend
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+This is the frontend application for VinylNet, built with Vue 3 and Vite.
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+## Prerequisites
+
+- Node.js (v18 or higher recommended)
+- npm or yarn
+
+## Installation
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd frontend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+
+## Configuration
+
+Create a `.env` file in the root directory with the following variables:
+
+```env
+VITE_API_URL=http://localhost:3000/api
+VITE_DISCOGS_API_KEY=your_discogs_api_key
+```
+
+## Development
+
+Start the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+## Build
+
+Build the application for production:
+
+```bash
+npm run build
+# or
+yarn build
+```
+
+## Deployment
+
+Deploy the contents of the `dist` folder to your web server.
