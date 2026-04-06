@@ -61,4 +61,4 @@ bin/
 obj/
 
 # Go build output
-backend/backend
+frontend/frontend
