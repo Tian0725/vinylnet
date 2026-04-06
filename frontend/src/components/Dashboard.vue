@@ -195,6 +195,30 @@ const logout = () => {
         <div class="pt-6 px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-600">
           Sistema
         </div>
+         <div class="space-y-1">
+          <button 
+            @click="toggleSubmenu('Configuracion')"
+            class="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 rounded-2xl transition-all group"
+          >
+            <div class="flex items-center">
+              <span class="mr-3 text-lg opacity-80 group-hover:scale-110 transition-transform text-neutral-400">⚙️</span>
+              <span class="font-bold text-sm text-neutral-300">Configuracion</span>
+            </div>
+            <svg 
+              class="w-4 h-4 text-neutral-600 transition-transform" 
+              :class="{ 'rotate-180': menus.Configuracion }"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            ><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          
+          <div v-show="menus.Configuracion" class="ml-9 border-l border-white/5 pl-4 space-y-1">
+            <button v-for="item in ['Usuarios', 'Roles', 'Permisos', 'Empresas', 'Sucursales']" :key="item"
+              class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors"
+            >
+              {{ item }}
+            </button>
+          </div>
+        </div>
         <button 
           @click="logout" 
           class="w-full flex items-center px-4 py-3 text-red-500 hover:bg-red-500/10 rounded-2xl transition-all group"
