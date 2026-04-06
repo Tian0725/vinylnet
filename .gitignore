@@ -35,6 +35,8 @@ tmp/
 temp/
 
 # Environment variables
+/backend/.env
+/frontend/.env
 .env
 .env.local
 .env.development.local
@@ -60,3 +62,4 @@ out/
 bin/
 obj/
 
+.gitignore
