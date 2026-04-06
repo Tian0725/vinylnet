@@ -40,6 +40,11 @@ func main() {
 
 		// El login que ya tenías
 		api.POST("/login", controllers.Login)
+
+		// RUTAS DE ROLES
+		api.GET("/roles", controllers.GetRoles)          // Consultar
+		api.POST("/roles", controllers.CreateRole)       // Crear
+		api.DELETE("/roles/:id", controllers.DeleteRole) // Borrar
 	}
 
 	// 4. Encender servidor

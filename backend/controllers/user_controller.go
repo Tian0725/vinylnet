@@ -16,6 +16,7 @@ type UsuarioResponse struct {
 	Username       string `json:"username"`
 	Rol            string `json:"rol"`
 	Activo         bool   `json:"activo"`
+	CreadoAt       string `json:"creado_at"`
 }
 
 // CreateUsuarioRequest: Lo que recibimos del Frontend (POST)
@@ -31,7 +32,7 @@ type CreateUsuarioRequest struct {
 // 1. CONSULTAR (GET /usuarios)
 func GetUsuarios(c *gin.Context) {
 	query := `
-        SELECT u.id, u.nombre_completo, u.username, r.nombre, u.activo 
+        SELECT u.id, u.nombre_completo, u.username, r.nombre, u.activo, u.creado_at
         FROM usuarios u
         JOIN roles r ON u.rol_id = r.id 
         ORDER BY u.id ASC`
@@ -46,7 +47,7 @@ func GetUsuarios(c *gin.Context) {
 	var usuarios []UsuarioResponse
 	for rows.Next() {
 		var u UsuarioResponse
-		if err := rows.Scan(&u.ID, &u.NombreCompleto, &u.Username, &u.Rol, &u.Activo); err != nil {
+		if err := rows.Scan(&u.ID, &u.NombreCompleto, &u.Username, &u.Rol, &u.Activo, &u.CreadoAt); err != nil {
 			continue
 		}
 		usuarios = append(usuarios, u)
