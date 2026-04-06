@@ -93,20 +93,12 @@ const ejecutarLogin = async () => {
   loading.value = true;
   
   try {
-<<<<<<< HEAD
-    const response = await fetch('http://localhost:8080/api/login', { 
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value)
-    });
-=======
 
 const response = await fetch('http://192.168.1.7:8080/api/login', { 
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(form.value)
 });
->>>>>>> ce146316e0a7c7ed8f568cd1f957052b37d70711
 
     if (response.ok) {
       const data = await response.json();

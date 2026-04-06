@@ -1,12 +1,5 @@
 @import "tailwindcss";
-
-@theme {
-  --color-brand-navy-dark: #071527;    /* Background Base */
-  --color-brand-navy-base: #0a1a35;    /* Official Darker Navy */
-  --color-brand-navy-surface: #162e55; /* Shirt Navy (Original) */
-  --color-brand-royal: #2563eb;        /* Dynamic Royal Blue */
-  --color-brand-accent: #f97316;       /* Brand Accent */
-}
+@config "../tailwind.config.js";
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
