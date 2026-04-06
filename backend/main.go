@@ -63,14 +63,27 @@ func main() {
 		c.Next()
 	})
 
-	// 2. ESTRUCTURA PARA EL LOGIN
+	// 2. ESTRUCTURA PARA EL LOGIN Y PRODUCTOS
 	type LoginRequest struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 
-	// 3. RUTA DE LOGIN
-	r.POST("/Login", func(c *gin.Context) {
+	type Product struct {
+		ID       int     `json:"id"`
+		Name     string  `json:"nombre"`
+		Unit     string  `json:"unidad"`
+		Price    float64 `json:"precio"`
+		Status   string  `json:"status"` // Calculado según stock
+		Stock    int     `json:"stock"`
+		StockMin int     `json:"stockMin"`
+	}
+
+	// 3. RUTAS DE LA API
+	api := r.Group("/api")
+	{
+		// Login
+		api.POST("/login", func(c *gin.Context) {
 		var req LoginRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(400, gin.H{"error": "JSON inválido"})
@@ -95,7 +108,42 @@ func main() {
 			"usuario": nombreCompleto,
 			"rol":     nombreRol,
 		})
-	})
+		})
+
+		// Inventario
+		api.GET("/productos", func(c *gin.Context) {
+			rows, err := db.Query("SELECT id, name, unit, price, stock FROM products")
+			if err != nil {
+				c.JSON(500, gin.H{"error": "Error al consultar productos"})
+				return
+			}
+			defer rows.Close()
+
+			var productos []Product
+			for rows.Next() {
+				var p Product
+				if err := rows.Scan(&p.ID, &p.Name, &p.Unit, &p.Price, &p.Stock); err != nil {
+					log.Println("Error escaneando producto:", err)
+					continue
+				}
+				
+				// Determinar status dinámicamente según stock
+				if p.Stock <= 0 {
+					p.Status = "Agotado"
+				} else if p.Stock <= 5 {
+					p.Status = "Stock Bajo"
+				} else {
+					p.Status = "Disponible"
+				}
+				
+				// StockMin simulado para la UI (podría ser una columna en el futuro)
+				p.StockMin = 5
+				
+				productos = append(productos, p)
+			}
+			c.JSON(200, productos)
+		})
+	}
 
 	// 4. INICIAR EN EL PUERTO 8080
 	r.Run("0.0.0.0:8080") // Aquí continuaría tu servidor Gin...

@@ -1,5 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue';
+import InventarioView from '../views/InventarioView.vue';
+
+// --- Estado de Navegación ---
+const vistaActual = ref('inicio');
 
 // --- Estado de Usuario ---
 const nombreUsuario = ref('Cargando...');
@@ -86,7 +90,11 @@ const logout = () => {
           Operaciones
         </div>
         
-        <button class="w-full flex items-center px-4 py-3 bg-brand-royal/10 border border-brand-royal/20 text-brand-royal rounded-2xl group transition-all">
+        <button 
+          @click="vistaActual = 'inicio'"
+          class="w-full flex items-center px-4 py-3 border rounded-2xl group transition-all"
+          :class="vistaActual === 'inicio' ? 'bg-brand-royal/10 border-brand-royal/20 text-brand-royal' : 'bg-transparent border-transparent text-neutral-400 hover:bg-white/5'"
+        >
           <span class="mr-3 text-lg opacity-80 group-hover:scale-110 transition-transform">🏠</span>
           <span class="font-bold text-sm">Inicio</span>
         </button>
@@ -109,7 +117,14 @@ const logout = () => {
           </button>
           
           <div v-show="menus.ficheros" class="ml-9 border-l border-white/5 pl-4 space-y-1">
-            <button v-for="item in ['Departamentos', 'Depósitos', 'Inventarios', 'Clientes', 'Vendedores', 'Bancos']" :key="item"
+            <button 
+              @click="vistaActual = 'inventario'"
+              class="w-full text-left px-3 py-2 text-xs font-semibold transition-colors"
+              :class="vistaActual === 'inventario' ? 'text-brand-royal' : 'text-neutral-500 hover:text-white'"
+            >
+              Inventarios
+            </button>
+            <button v-for="item in ['Departamentos', 'Depósitos', 'Clientes', 'Vendedores', 'Bancos']" :key="item"
               class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors"
             >
               {{ item }}
@@ -260,58 +275,64 @@ const logout = () => {
 
       <!-- Main Scrollable Content -->
       <main class="flex-1 overflow-y-auto p-6 lg:p-10 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-brand-navy-base/20 via-brand-navy-dark to-brand-navy-dark">
-        <div class="max-w-7xl mx-auto space-y-10">
+        <div class="max-w-7xl mx-auto">
           
-          <!-- View Title -->
-          <div class="flex flex-col space-y-1">
-            <h1 class="text-3xl font-black text-white tracking-tighter uppercase italic">Panel de Control</h1>
-            <p class="text-sm font-medium text-neutral-500 uppercase tracking-widest">Resumen ejecutivo del sistema</p>
-          </div>
+          <!-- Vista: Dashboard General (Inicio) -->
+          <div v-if="vistaActual === 'inicio'" class="space-y-10 animate-in fade-in duration-500">
+            <!-- View Title -->
+            <div class="flex flex-col space-y-1">
+              <h1 class="text-3xl font-black text-white tracking-tighter uppercase italic">Panel de Control</h1>
+              <p class="text-sm font-medium text-neutral-500 uppercase tracking-widest">Resumen ejecutivo del sistema</p>
+            </div>
 
-          <!-- Stats Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div v-for="stat in [
-              { label: 'Ventas del Día', value: '$0.00', icon: '💰', color: 'from-emerald-500/20 to-emerald-500/5', border: 'border-emerald-500/20' },
-              { label: 'Equipos Activos', value: '0', icon: '💻', color: 'from-brand-royal/20 to-brand-royal/5', border: 'border-brand-royal/20' },
-              { label: 'Alertas Sistema', value: 'Ninguna', icon: '⚠️', color: 'from-amber-500/20 to-amber-500/5', border: 'border-amber-500/20' },
-              { label: 'Transacciones', value: '1,240', icon: '📊', color: 'from-purple-500/20 to-purple-500/5', border: 'border-purple-500/20' }
-            ]" :key="stat.label" 
-              class="relative group"
-            >
-              <div :class="`h-full p-6 rounded-3xl bg-neutral-900/50 border ${stat.border} overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50`">
-                <div :class="`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-100 transition-opacity`"></div>
-                <div class="relative flex flex-col justify-between h-full space-y-6">
-                  <div class="flex items-center justify-between">
-                    <span class="text-2xl">{{ stat.icon }}</span>
-                    <span class="text-[10px] font-black uppercase tracking-widest text-neutral-500 group-hover:text-white transition-colors">{{ stat.label }}</span>
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div v-for="stat in [
+                { label: 'Ventas del Día', value: '$0.00', icon: '💰', color: 'from-emerald-500/20 to-emerald-500/5', border: 'border-emerald-500/20' },
+                { label: 'Equipos Activos', value: '0', icon: '💻', color: 'from-brand-royal/20 to-brand-royal/5', border: 'border-brand-royal/20' },
+                { label: 'Alertas Sistema', value: 'Ninguna', icon: '⚠️', color: 'from-amber-500/20 to-amber-500/5', border: 'border-amber-500/20' },
+                { label: 'Transacciones', value: '1,240', icon: '📊', color: 'from-purple-500/20 to-purple-500/5', border: 'border-purple-500/20' }
+              ]" :key="stat.label" 
+                class="relative group"
+              >
+                <div :class="`h-full p-6 rounded-3xl bg-neutral-900/50 border ${stat.border} overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50`">
+                  <div :class="`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-100 transition-opacity`"></div>
+                  <div class="relative flex flex-col justify-between h-full space-y-6">
+                    <div class="flex items-center justify-between">
+                      <span class="text-2xl">{{ stat.icon }}</span>
+                      <span class="text-[10px] font-black uppercase tracking-widest text-neutral-500 group-hover:text-white transition-colors">{{ stat.label }}</span>
+                    </div>
+                    <div class="text-2xl font-black text-white tracking-tight">{{ stat.value }}</div>
                   </div>
-                  <div class="text-2xl font-black text-white tracking-tight">{{ stat.value }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Feature Placeholder -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10 text-center sm:text-left">
+              <div class="lg:col-span-2 p-8 rounded-3xl bg-white/5 border border-white/10 flex flex-col justify-center items-center h-80 space-y-6">
+                <div class="p-4 rounded-full bg-brand-royal/10 text-brand-royal">
+                  <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div class="space-y-2">
+                  <h3 class="text-xl font-bold text-white tracking-tight">Listo para Datos en Tiempo Real</h3>
+                  <p class="text-sm text-neutral-500 max-w-sm">Conecta tus endpoints de backend para visualizar flujos de caja y analíticas de inventario aquí.</p>
+                </div>
+              </div>
+              
+              <div class="p-8 rounded-3xl bg-white/5 border border-white/10 flex flex-col justify-center items-center h-80 space-y-6">
+                <div class="p-4 rounded-full bg-amber-500/10 text-amber-400 italic font-black text-2xl">?</div>
+                <div class="space-y-2">
+                  <h3 class="text-xl font-bold text-white tracking-tight">Ayuda y Soporte</h3>
+                  <p class="text-sm text-neutral-500">¿Necesitas ayuda con el nuevo diseño? Consulta la guía rápida.</p>
+                  <button class="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-xs font-bold uppercase transition-all">Ver Guía</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Feature Placeholder -->
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10 text-center sm:text-left">
-            <div class="lg:col-span-2 p-8 rounded-3xl bg-white/5 border border-white/10 flex flex-col justify-center items-center h-80 space-y-6">
-              <div class="p-4 rounded-full bg-brand-royal/10 text-brand-royal">
-                <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-              </div>
-              <div class="space-y-2">
-                <h3 class="text-xl font-bold text-white tracking-tight">Listo para Datos en Tiempo Real</h3>
-                <p class="text-sm text-neutral-500 max-w-sm">Conecta tus endpoints de backend para visualizar flujos de caja y analíticas de inventario aquí.</p>
-              </div>
-            </div>
-            
-            <div class="p-8 rounded-3xl bg-white/5 border border-white/10 flex flex-col justify-center items-center h-80 space-y-6">
-              <div class="p-4 rounded-full bg-amber-500/10 text-amber-400 italic font-black text-2xl">?</div>
-              <div class="space-y-2">
-                <h3 class="text-xl font-bold text-white tracking-tight">Ayuda y Soporte</h3>
-                <p class="text-sm text-neutral-500">¿Necesitas ayuda con el nuevo diseño? Consulta la guía rápida.</p>
-                <button class="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-xs font-bold uppercase transition-all">Ver Guía</button>
-              </div>
-            </div>
-          </div>
+          <!-- Vista: Inventario -->
+          <InventarioView v-else-if="vistaActual === 'inventario'" />
 
         </div>
       </main>
