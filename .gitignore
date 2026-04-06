@@ -60,5 +60,3 @@ out/
 bin/
 obj/
 
-# Go build output
-frontend/frontend
