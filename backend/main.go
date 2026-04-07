@@ -18,7 +18,7 @@ func main() {
 
 	r := gin.Default()
 
-	// 2. Middleware CORS (Cópialo igual que lo tenías)
+	// 2. Middleware CORS
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -30,18 +30,25 @@ func main() {
 		c.Next()
 	})
 
-	// 3. RUTAS DEL CRUD DE USUARIOS
-	// Estas rutas llaman a las funciones que definiste en user_controller.go
+	// 3. RUTAS DE LA API
 	api := r.Group("/api")
 	{
-		api.GET("/usuarios", controllers.GetUsuarios)          // Consultar
-		api.POST("/usuarios", controllers.CreateUsuario)       // Crear (Insert)
-		api.DELETE("/usuarios/:id", controllers.DeleteUsuario) // Borrar (Delete)
+		// --- Módulo de Usuarios ---
+		api.GET("/usuarios", controllers.GetUsuarios)
+		api.POST("/usuarios", controllers.CreateUsuario)
+		api.DELETE("/usuarios/:id", controllers.DeleteUsuario)
 
-		// El login que ya tenías
+		// --- Módulo de Roles (NUEVO) ---
+		api.GET("/roles", controllers.GetRoles)   // Para el select en el front
+		api.POST("/roles", controllers.CreateRol) // Por si quieres crear roles nuevos
+		api.PUT("/roles/:id", controllers.UpdateRol)
+		api.DELETE("/roles/:id", controllers.DeleteRol) // Por si quieres editar descripciones
+
+		// --- Autenticación ---
 		api.POST("/login", controllers.Login)
 	}
 
 	// 4. Encender servidor
+	log.Println("Servidor VINYLNET corriendo en http://localhost:8080")
 	r.Run(":8080")
 }

@@ -24,8 +24,12 @@ const mobileMenuVisible = ref(false);
 
 // --- Lógica de CRUD de Usuarios ---
 const usuarios = ref([]);
+const roles = ref([]);
 const cargando = ref(false);
 const modalAbierto = ref(false);
+const rolModalAbierto = ref(false);
+const rolEditando = ref(false);
+const rolForm = ref({ id: null, nombre: '', descripcion: '' });
 const API_URL = 'http://localhost:8080/api';
 
 // Formulario para Nuevo/Editar Usuario
@@ -75,10 +79,80 @@ const eliminarUsuario = async (id) => {
   }
 };
 
+
 const resetForm = () => {
   form.value = { id: null, nombre_completo: '', username: '', password: '', rol_id: 1 };
 };
 
+const resetRolForm = () => {
+  rolForm.value = { id: null, nombre: '', descripcion: '' };
+  rolEditando.value = false;
+};
+
+const abrirNuevoRol = () => {
+  resetRolForm();
+  rolModalAbierto.value = true;
+};
+
+const editarRol = (rol) => {
+  rolForm.value = { id: rol.id, nombre: rol.nombre, descripcion: rol.descripcion || '' };
+  rolEditando.value = true;
+  rolModalAbierto.value = true;
+};
+
+const guardarRol = async () => {
+  try {
+    if (!rolForm.value.nombre) {
+      alert('El nombre del rol es obligatorio.');
+      return;
+    }
+
+    if (rolForm.value.id) {
+      await axios.put(`${API_URL}/roles/${rolForm.value.id}`, rolForm.value);
+    } else {
+      await axios.post(`${API_URL}/roles`, rolForm.value);
+    }
+
+    rolModalAbierto.value = false;
+    resetRolForm();
+    fetchRoles();
+  } catch (err) {
+    alert('Error al guardar el rol. Revisa la consola.');
+    console.error(err);
+  }
+};
+
+const eliminarRol = async (id) => {
+  if (confirm('¿Estás seguro de eliminar este rol?')) {
+    try {
+      await axios.delete(`${API_URL}/roles/${id}`);
+      fetchRoles();
+    } catch (err) {
+      alert('No se pudo eliminar el rol.');
+      console.error(err);
+    }
+  }
+};
+
+const cerrarRolModal = () => {
+  rolModalAbierto.value = false;
+  resetRolForm();
+};
+
+// Obtener Roles de la DB
+const fetchRoles = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/roles`);
+    roles.value = res.data || [];
+    
+    // Opcional: Si hay roles, poner el primero por defecto en el form
+    if (roles.value.length > 0 && !form.value.rol_id) {
+      form.value.rol_id = roles.value[0].id;
+    }
+  } catch (err) {
+    console.error("Error al obtener roles:", err);
+  }
+};
 // --- Inicialización ---
 onMounted(() => {
   const nombre = localStorage.getItem('usuario') || 'Jesus Sarmiento';
@@ -89,6 +163,7 @@ onMounted(() => {
   iniciales.value = nombre.split(' ').filter(n => n).map(n => n[0]).join('').toUpperCase().substring(0, 2);
 
   fetchUsuarios();
+  fetchRoles();
 });
 
 // --- Funciones de Navegación ---
@@ -105,6 +180,9 @@ const logout = () => {
   localStorage.clear();
   window.location.href = '/';
 };
+
+
+
 </script>
 
 <template>
@@ -194,7 +272,15 @@ const logout = () => {
           </button>
           <div v-show="menus.Configuracion" class="ml-9 border-l border-white/5 pl-4 space-y-1">
             <button @click="navegar('usuarios')" class="w-full text-left px-3 py-2 text-xs font-semibold transition-colors" :class="vistaActual === 'usuarios' ? 'text-brand-royal' : 'text-neutral-500 hover:text-white'">Usuarios</button>
-            <button v-for="item in ['Roles', 'Permisos', 'Empresas', 'Sucursales']" :key="item" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">{{ item }}</button>
+            <button
+              v-for="item in ['Roles', 'Permisos', 'Empresas', 'Sucursales']"
+              :key="item"
+              @click="item === 'Roles' ? navegar('roles') : null"
+              class="w-full text-left px-3 py-2 text-xs font-semibold transition-colors"
+              :class="item === 'Roles' ? (vistaActual === 'roles' ? 'text-brand-royal' : 'text-neutral-500 hover:text-white') : 'text-neutral-500 hover:text-white'"
+            >
+              {{ item }}
+            </button>
           </div>
         </div>
 
@@ -275,6 +361,41 @@ const logout = () => {
             </div>
           </div>
 
+          <div v-if="vistaActual === 'roles'" class="space-y-6">
+            <div class="flex justify-between items-center">
+              <div>
+                <h2 class="text-2xl font-black text-white italic uppercase">Gestión de Roles</h2>
+                <p class="text-xs text-neutral-500 font-bold uppercase tracking-widest">Crear, editar o eliminar roles del sistema</p>
+              </div>
+              <button @click="abrirNuevoRol" class="bg-brand-royal hover:bg-brand-royal/80 text-white px-6 py-2 rounded-xl font-bold text-xs transition-all shadow-lg shadow-brand-royal/20">
+                + NUEVO ROL
+              </button>
+            </div>
+
+            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-md">
+              <table class="w-full text-left border-collapse">
+                <thead class="bg-white/5 text-[10px] uppercase text-neutral-500 font-bold tracking-widest">
+                  <tr>
+                    <th class="p-5">Nombre</th>
+                    <th class="p-5">Descripción</th>
+                    <th class="p-5 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                  <tr v-for="rol in roles" :key="rol.id" class="hover:bg-white/5 transition-colors">
+                    <td class="p-5 font-bold text-white text-sm">{{ rol.nombre }}</td>
+                    <td class="p-5 text-neutral-400 text-sm">{{ rol.descripcion || 'Sin descripción' }}</td>
+                    <td class="p-5 text-right space-x-2">
+                      <button @click="editarRol(rol)" class="text-brand-royal hover:text-white text-xs font-bold uppercase transition-colors">Editar</button>
+                      <button @click="eliminarRol(rol.id)" class="text-red-400 hover:text-red-300 text-xs font-bold uppercase transition-colors">Eliminar</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-if="roles.length === 0" class="p-10 text-center text-brand-royal animate-pulse uppercase font-black">No hay roles registrados.</div>
+            </div>
+          </div>
+
         </div>
       </main>
     </div>
@@ -288,17 +409,24 @@ const logout = () => {
             <input v-model="form.nombre_completo" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 ring-brand-royal/50 text-white">
           </div>
           <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-1">
-              <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Username</label>
-              <input v-model="form.username" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none text-white">
-            </div>
-            <div class="space-y-1">
-              <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Rol</label>
-              <select v-model="form.rol_id" class="w-full bg-brand-navy-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none">
-                <option :value="1">Administrador</option>
-                <option :value="2">Operador</option>
-              </select>
-            </div>
+          <div class="space-y-1">
+    <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Username</label>
+    <input v-model="form.username" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none text-white">
+  </div>
+
+  <div class="space-y-1">
+    <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Rol</label>
+    <select 
+      v-model="form.rol_id" 
+      class="w-full bg-brand-navy-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 ring-brand-royal/50"
+    >
+      <option v-if="roles.length === 0" disabled value="">Cargando roles...</option>
+      
+      <option v-for="rol in roles" :key="rol.id" :value="rol.id">
+        {{ rol.nombre }}
+      </option>
+    </select>
+  </div>
           </div>
           <div class="space-y-1">
             <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Contraseña Inicial</label>
@@ -307,6 +435,26 @@ const logout = () => {
           <div class="flex space-x-3 pt-4">
             <button @click="modalAbierto = false" class="flex-1 py-3 text-xs font-bold text-neutral-400 hover:text-white uppercase transition-colors">Cancelar</button>
             <button @click="guardarUsuario" class="flex-1 bg-brand-royal py-3 rounded-xl text-xs font-black text-white hover:bg-brand-royal/80 shadow-lg shadow-brand-royal/20 transition-all uppercase">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="rolModalAbierto" class="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
+      <div class="bg-brand-navy-base border border-white/10 w-full max-w-md rounded-3xl p-8 shadow-2xl">
+        <h3 class="text-xl font-black text-white italic uppercase mb-6 tracking-tighter">{{ rolEditando ? 'Editar Rol' : 'Crear Rol' }}</h3>
+        <div class="space-y-4">
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Nombre del Rol</label>
+            <input v-model="rolForm.nombre" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 ring-brand-royal/50 text-white">
+          </div>
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Descripción</label>
+            <textarea v-model="rolForm.descripcion" rows="3" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 ring-brand-royal/50 text-white"></textarea>
+          </div>
+          <div class="flex space-x-3 pt-4">
+            <button @click="cerrarRolModal" class="flex-1 py-3 text-xs font-bold text-neutral-400 hover:text-white uppercase transition-colors">Cancelar</button>
+            <button @click="guardarRol" class="flex-1 bg-brand-royal py-3 rounded-xl text-xs font-black text-white hover:bg-brand-royal/80 shadow-lg shadow-brand-royal/20 transition-all uppercase">Guardar</button>
           </div>
         </div>
       </div>
