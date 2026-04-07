@@ -45,6 +45,15 @@ func main() {
 		api.GET("/roles", controllers.GetRoles)          // Consultar
 		api.POST("/roles", controllers.CreateRole)       // Crear
 		api.DELETE("/roles/:id", controllers.DeleteRole) // Borrar
+
+		// RUTAS DE FACTURAS (VENTAS)
+		api.GET("/invoices", controllers.GetInvoices)
+		api.GET("/invoices/:id", controllers.GetInvoiceDetails)
+		api.POST("/invoices", controllers.CreateInvoice)
+
+		// RUTAS AUXILIARES
+		api.GET("/clients", controllers.GetClients)
+		api.GET("/products", controllers.GetProducts)
 	}
 
 	// 4. Encender servidor
