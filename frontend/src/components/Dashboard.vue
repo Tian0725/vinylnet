@@ -26,11 +26,15 @@ const cargando = ref(false);
 
 // --- Lógica de CRUD de Usuarios ---
 const usuarios = ref([]);
+const roles = ref([]);
 const listaInvoices = ref([]);     
 const listaClientesValue = ref([]); 
 const listaProductosValue = ref([]); 
 const listaTasas = ref({}); // Nueva: Tasas de cambio (USD/VES, USD/COP)
 const modalAbierto = ref(false);
+const rolModalAbierto = ref(false);
+const rolEditando = ref(false);
+const rolForm = ref({ id: null, nombre: '', descripcion: '' });
 const modalVentaAbierto = ref(false); // Nueva: Modal de venta
 const API_URL = 'http://localhost:8080/api';
 
@@ -81,10 +85,80 @@ const eliminarUsuario = async (id) => {
   }
 };
 
+
 const resetForm = () => {
   form.value = { id: null, nombre_completo: '', username: '', password: '', rol_id: 1 };
 };
 
+const resetRolForm = () => {
+  rolForm.value = { id: null, nombre: '', descripcion: '' };
+  rolEditando.value = false;
+};
+
+const abrirNuevoRol = () => {
+  resetRolForm();
+  rolModalAbierto.value = true;
+};
+
+const editarRol = (rol) => {
+  rolForm.value = { id: rol.id, nombre: rol.nombre, descripcion: rol.descripcion || '' };
+  rolEditando.value = true;
+  rolModalAbierto.value = true;
+};
+
+const guardarRol = async () => {
+  try {
+    if (!rolForm.value.nombre) {
+      alert('El nombre del rol es obligatorio.');
+      return;
+    }
+
+    if (rolForm.value.id) {
+      await axios.put(`${API_URL}/roles/${rolForm.value.id}`, rolForm.value);
+    } else {
+      await axios.post(`${API_URL}/roles`, rolForm.value);
+    }
+
+    rolModalAbierto.value = false;
+    resetRolForm();
+    fetchRoles();
+  } catch (err) {
+    alert('Error al guardar el rol. Revisa la consola.');
+    console.error(err);
+  }
+};
+
+const eliminarRol = async (id) => {
+  if (confirm('¿Estás seguro de eliminar este rol?')) {
+    try {
+      await axios.delete(`${API_URL}/roles/${id}`);
+      fetchRoles();
+    } catch (err) {
+      alert('No se pudo eliminar el rol.');
+      console.error(err);
+    }
+  }
+};
+
+const cerrarRolModal = () => {
+  rolModalAbierto.value = false;
+  resetRolForm();
+};
+
+// Obtener Roles de la DB
+const fetchRoles = async () => {
+  try {
+    const res = await axios.get(`${API_URL}/roles`);
+    roles.value = res.data || [];
+    
+    // Opcional: Si hay roles, poner el primero por defecto en el form
+    if (roles.value.length > 0 && !form.value.rol_id) {
+      form.value.rol_id = roles.value[0].id;
+    }
+  } catch (err) {
+    console.error("Error al obtener roles:", err);
+  }
+};
 // --- Inicialización ---
 onMounted(() => {
   const nombre = localStorage.getItem('usuario') || 'Jesus Sarmiento';
@@ -95,6 +169,7 @@ onMounted(() => {
   iniciales.value = nombre.split(' ').filter(n => n).map(n => n[0]).join('').toUpperCase().substring(0, 2);
 
   fetchUsuarios();
+  fetchRoles();
 });
 
 // --- Funciones de Navegación ---
@@ -129,6 +204,9 @@ const logout = () => {
   localStorage.clear();
   window.location.href = '/';
 };
+
+
+
 
 
 const crearUsuario = async () => {
@@ -310,25 +388,6 @@ const crearRol = async () => {
   }
 };
 
-const eliminarRol = async (id) => {
-  if (!confirm("¿Estás seguro de eliminar este rol?")) return;
-
-  try {
-    const response = await fetch(`http://localhost:8080/api/roles/${id}`, {
-      method: 'DELETE'
-    });
-    if (response.ok) {
-      alert("Rol eliminado");
-      obtenerRoles();
-    } else {
-      const data = await response.json();
-      alert("Error: " + (data.error || "No se pudo eliminar"));
-    }
-  } catch (error) {
-    console.error("Error eliminando rol:", error);
-  }
-};
-
 const formatearFecha = (fechaRaw) => {
   if (!fechaRaw) return '-';
   const fecha = new Date(fechaRaw);
@@ -431,8 +490,16 @@ const formatearFecha = (fechaRaw) => {
           <div v-show="menus.Configuracion" class="ml-9 border-l border-white/5 pl-4 space-y-1">
             <button @click="cambiarVista('usuarios')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">Usuarios</button>
             <button @click="cambiarVista('roles')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">Roles</button>
-            <button v-for="item in ['Permisos', 'Empresas', 'Sucursales']" :key="item" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">
+            <button
+              v-for="item in ['Permisos', 'Empresas', 'Sucursales']"
+              :key="item"
+              @click="item === 'Roles' ? navegar('roles') : null"
+              class="w-full text-left px-3 py-2 text-xs font-semibold transition-colors"
+              :class="item === 'Roles' ? (vistaActual === 'roles' ? 'text-brand-royal' : 'text-neutral-500 hover:text-white') : 'text-neutral-500 hover:text-white'"
+            >
+              
               {{ item }}
+            
             </button>
           </div>
         </div>
@@ -545,14 +612,13 @@ const formatearFecha = (fechaRaw) => {
             </div>
           </div>
 
-          <!-- VISTA: ROLES -->
           <div v-if="vistaActual === 'roles'" class="space-y-6">
             <div class="flex justify-between items-center">
               <div>
                 <h2 class="text-2xl font-black text-white italic uppercase">Gestión de Roles</h2>
-                <p class="text-xs text-neutral-500 font-bold uppercase tracking-widest">Niveles de acceso del sistema</p>
+                <p class="text-xs text-neutral-500 font-bold uppercase tracking-widest">Crear, editar o eliminar roles del sistema</p>
               </div>
-              <button @click="crearRol" class="bg-brand-royal hover:bg-brand-royal/80 text-white px-6 py-2 rounded-xl font-bold text-xs transition-all shadow-lg shadow-brand-royal/20">
+              <button @click="abrirNuevoRol" class="bg-brand-royal hover:bg-brand-royal/80 text-white px-6 py-2 rounded-xl font-bold text-xs transition-all shadow-lg shadow-brand-royal/20">
                 + NUEVO ROL
               </button>
             </div>
@@ -561,74 +627,23 @@ const formatearFecha = (fechaRaw) => {
               <table class="w-full text-left border-collapse">
                 <thead class="bg-white/5 text-[10px] uppercase text-neutral-500 font-bold tracking-widest">
                   <tr>
-                    <th class="p-5">Nombre del Rol</th>
+                    <th class="p-5">Nombre</th>
                     <th class="p-5">Descripción</th>
                     <th class="p-5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
-                  <tr v-for="role in listaRoles" :key="role.id" class="hover:bg-white/5 transition-colors">
-                    <td class="p-5 font-bold text-white text-sm">{{ role.nombre }}</td>
-                    <td class="p-5 text-neutral-400 text-xs">{{ role.descripcion || 'Sin descripción' }}</td>
-                    <td class="p-5 text-right">
-                      <button @click="eliminarRol(role.id)" class="text-red-400 hover:text-red-300 text-xs font-bold uppercase transition-colors">Eliminar</button>
+                  <tr v-for="rol in roles" :key="rol.id" class="hover:bg-white/5 transition-colors">
+                    <td class="p-5 font-bold text-white text-sm">{{ rol.nombre }}</td>
+                    <td class="p-5 text-neutral-400 text-sm">{{ rol.descripcion || 'Sin descripción' }}</td>
+                    <td class="p-5 text-right space-x-2">
+                      <button @click="editarRol(rol)" class="text-brand-royal hover:text-white text-xs font-bold uppercase transition-colors">Editar</button>
+                      <button @click="eliminarRol(rol.id)" class="text-red-400 hover:text-red-300 text-xs font-bold uppercase transition-colors">Eliminar</button>
                     </td>
                   </tr>
                 </tbody>
               </table>
-              <div v-if="cargando" class="p-10 text-center text-brand-royal animate-pulse uppercase font-black">Cargando roles...</div>
-            </div>
-          </div>
-
-          <!-- VISTA: VENTAS (FACTURAS, DEVOLUCIONES, ANULACIONES) -->
-          <div v-if="vistaActual.startsWith('ventas_')" class="space-y-6">
-            <div class="flex justify-between items-center">
-              <div>
-                <h2 class="text-2xl font-black text-white italic uppercase">{{ vistaActual.replace('ventas_', '').replace('_', ' ') }}</h2>
-                <p class="text-xs text-neutral-500 font-bold uppercase tracking-widest">Documentos de venta registrados</p>
-              </div>
-              <!-- BOTON NUEVA VENTA -->
-              <button 
-                v-if="vistaActual === 'ventas_facturas'" 
-                @click="abrirModalVenta" 
-                class="bg-brand-royal hover:bg-brand-royal/80 text-white px-6 py-2 rounded-xl font-bold text-xs transition-all shadow-lg shadow-brand-royal/20"
-              >
-                + NUEVA VENTA
-              </button>
-            </div>
-
-            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-md">
-              <table class="w-full text-left border-collapse">
-                <thead class="bg-white/5 text-[10px] uppercase text-neutral-500 font-bold tracking-widest">
-                  <tr>
-                    <th class="p-5">Número</th>
-                    <th class="p-5">Cliente</th>
-                    <th class="p-5">Fecha</th>
-                    <th class="p-5">Estado</th>
-                    <th class="p-5 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-white/5">
-                  <tr v-for="inv in listaInvoices" :key="inv.id" class="hover:bg-white/5 transition-colors">
-                    <td class="p-5 font-bold text-white text-sm">#{{ inv.number }}</td>
-                    <td class="p-5 text-brand-royal font-semibold text-xs">{{ inv.client_name?.String || 'Cliente Final' }}</td>
-                    <td class="p-5 text-neutral-400 text-xs">{{ inv.issue_date }}</td>
-                    <td class="p-5">
-                      <span :class="{
-                        'px-3 py-1 text-[10px] font-bold rounded-full': true,
-                        'bg-emerald-500/10 text-emerald-500': inv.status === 'FINAL',
-                        'bg-red-500/10 text-red-500': inv.status === 'VOIDED',
-                        'bg-amber-500/10 text-amber-500': inv.status === 'RETURNED'
-                      }">{{ inv.status }}</span>
-                    </td>
-                    <td class="p-5 text-right font-black text-white text-sm">
-                      {{ inv.currency }} {{ inv.total.toLocaleString() }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <div v-if="cargando" class="p-10 text-center text-brand-royal animate-pulse uppercase font-black">Escaneando transacciones...</div>
-              <div v-else-if="listaInvoices.length === 0" class="p-10 text-center text-neutral-600 font-bold uppercase text-xs">No se encontraron documentos</div>
+              <div v-if="roles.length === 0" class="p-10 text-center text-brand-royal animate-pulse uppercase font-black">No hay roles registrados.</div>
             </div>
           </div>
 
@@ -645,17 +660,24 @@ const formatearFecha = (fechaRaw) => {
             <input v-model="form.nombre_completo" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 ring-brand-royal/50 text-white">
           </div>
           <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-1">
-              <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Username</label>
-              <input v-model="form.username" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none text-white">
-            </div>
-            <div class="space-y-1">
-              <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Rol</label>
-              <select v-model="form.rol_id" class="w-full bg-brand-navy-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none">
-                <option :value="1">Administrador</option>
-                <option :value="2">Operador</option>
-              </select>
-            </div>
+          <div class="space-y-1">
+    <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Username</label>
+    <input v-model="form.username" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none text-white">
+  </div>
+
+  <div class="space-y-1">
+    <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Rol</label>
+    <select 
+      v-model="form.rol_id" 
+      class="w-full bg-brand-navy-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 ring-brand-royal/50"
+    >
+      <option v-if="roles.length === 0" disabled value="">Cargando roles...</option>
+      
+      <option v-for="rol in roles" :key="rol.id" :value="rol.id">
+        {{ rol.nombre }}
+      </option>
+    </select>
+  </div>
           </div>
           <div class="space-y-1">
             <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Contraseña Inicial</label>
@@ -775,6 +797,26 @@ const formatearFecha = (fechaRaw) => {
                 Confirmar y Registrar Venta
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="rolModalAbierto" class="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
+      <div class="bg-brand-navy-base border border-white/10 w-full max-w-md rounded-3xl p-8 shadow-2xl">
+        <h3 class="text-xl font-black text-white italic uppercase mb-6 tracking-tighter">{{ rolEditando ? 'Editar Rol' : 'Crear Rol' }}</h3>
+        <div class="space-y-4">
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Nombre del Rol</label>
+            <input v-model="rolForm.nombre" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 ring-brand-royal/50 text-white">
+          </div>
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Descripción</label>
+            <textarea v-model="rolForm.descripcion" rows="3" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 ring-brand-royal/50 text-white"></textarea>
+          </div>
+          <div class="flex space-x-3 pt-4">
+            <button @click="cerrarRolModal" class="flex-1 py-3 text-xs font-bold text-neutral-400 hover:text-white uppercase transition-colors">Cancelar</button>
+            <button @click="guardarRol" class="flex-1 bg-brand-royal py-3 rounded-xl text-xs font-black text-white hover:bg-brand-royal/80 shadow-lg shadow-brand-royal/20 transition-all uppercase">Guardar</button>
           </div>
         </div>
       </div>
