@@ -388,25 +388,6 @@ const crearRol = async () => {
   }
 };
 
-const eliminarRol = async (id) => {
-  if (!confirm("¿Estás seguro de eliminar este rol?")) return;
-
-  try {
-    const response = await fetch(`http://localhost:8080/api/roles/${id}`, {
-      method: 'DELETE'
-    });
-    if (response.ok) {
-      alert("Rol eliminado");
-      obtenerRoles();
-    } else {
-      const data = await response.json();
-      alert("Error: " + (data.error || "No se pudo eliminar"));
-    }
-  } catch (error) {
-    console.error("Error eliminando rol:", error);
-  }
-};
-
 const formatearFecha = (fechaRaw) => {
   if (!fechaRaw) return '-';
   const fecha = new Date(fechaRaw);
