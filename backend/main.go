@@ -54,6 +54,7 @@ func main() {
 		// RUTAS AUXILIARES
 		api.GET("/clients", controllers.GetClients)
 		api.GET("/products", controllers.GetProducts)
+		api.GET("/rates", controllers.GetActiveRates)
 	}
 
 	// 4. Encender servidor

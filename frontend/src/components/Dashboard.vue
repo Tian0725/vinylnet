@@ -27,8 +27,9 @@ const cargando = ref(false);
 // --- Lógica de CRUD de Usuarios ---
 const usuarios = ref([]);
 const listaInvoices = ref([]);     
-const listaClientesValue = ref([]); // Nueva: Datos de clientes
-const listaProductosValue = ref([]); // Nueva: Datos de productos
+const listaClientesValue = ref([]); 
+const listaProductosValue = ref([]); 
+const listaTasas = ref({}); // Nueva: Tasas de cambio (USD/VES, USD/COP)
 const modalAbierto = ref(false);
 const modalVentaAbierto = ref(false); // Nueva: Modal de venta
 const API_URL = 'http://localhost:8080/api';
@@ -180,12 +181,20 @@ const abrirModalVenta = async () => {
   modalVentaAbierto.value = true;
   
   try {
-    const [c, p] = await Promise.all([
+    const [c, p, r] = await Promise.all([
       axios.get(`${API_URL}/clients`),
-      axios.get(`${API_URL}/products`)
+      axios.get(`${API_URL}/products`),
+      axios.get(`${API_URL}/rates`)
     ]);
     listaClientesValue.value = c.data || [];
     listaProductosValue.value = p.data || [];
+    
+    // Organizar tasas en objeto { 'VES': 36.5, 'COP': 3950 }
+    const ratesObj = {};
+    (r.data || []).forEach(rate => {
+      ratesObj[rate.currency_code] = rate.rate;
+    });
+    listaTasas.value = ratesObj;
   } catch (err) { console.error(err); }
 };
 
@@ -216,7 +225,7 @@ const eliminarItemVenta = (index) => {
   ventaForm.value.items.splice(index, 1);
 };
 
-const totalesVenta = ref({ subtotal: 0, iva: 0, igtf: 0, total: 0 });
+const totalesVenta = ref({ subtotal: 0, iva: 0, igtf: 0, total: 0, equivalents: { USD: 0, VES: 0, COP: 0 } });
 
 const calcularTotales = () => {
   let sub = 0;
@@ -227,11 +236,26 @@ const calcularTotales = () => {
   let iva = ventaForm.value.apply_iva ? sub * 0.16 : 0;
   let igtf = (ventaForm.value.apply_igtf && ventaForm.value.currency !== 'VES') ? (sub + iva) * 0.03 : 0;
   
+  const finalTotal = sub + iva + igtf;
+  
+  // Calcular equivalencias
+  const rates = listaTasas.value;
+  let totalUSD = 0;
+  
+  if (ventaForm.value.currency === 'USD') totalUSD = finalTotal;
+  else if (ventaForm.value.currency === 'VES') totalUSD = finalTotal / (rates.VES || 1);
+  else if (ventaForm.value.currency === 'COP') totalUSD = finalTotal / (rates.COP || 1);
+
   totalesVenta.value = {
     subtotal: sub,
     iva: iva,
     igtf: igtf,
-    total: sub + iva + igtf
+    total: finalTotal,
+    equivalents: {
+      USD: totalUSD,
+      VES: totalUSD * (rates.VES || 0),
+      COP: totalUSD * (rates.COP || 0)
+    }
   };
 };
 
@@ -675,10 +699,11 @@ const formatearFecha = (fechaRaw) => {
               <label class="text-[10px] font-black text-brand-royal uppercase tracking-widest">2. Configuración Fiscal</label>
               <div class="bg-white/5 p-6 rounded-3xl space-y-4 border border-white/5">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-neutral-400">Moneda</span>
+                  <span class="text-xs font-bold text-neutral-400">Moneda Cobro</span>
                   <select v-model="ventaForm.currency" @change="calcularTotales" class="bg-brand-navy-dark text-[10px] font-black text-white border-0 rounded-lg px-2 py-1 outline-none">
                     <option value="USD">USD ($)</option>
                     <option value="VES">VES (Bs.)</option>
+                    <option value="COP">COP (Pesos)</option>
                   </select>
                 </div>
                 <div class="flex items-center justify-between">
@@ -716,15 +741,31 @@ const formatearFecha = (fechaRaw) => {
             </div>
 
             <!-- Totals Footer -->
-            <div class="pt-6 border-t border-white/10 grid grid-cols-2 gap-4">
-              <div class="space-y-1">
-                <div class="flex justify-between text-[10px] font-bold text-neutral-500 uppercase"><span>Subtotal</span> <span class="text-white">{{ ventaForm.currency }} {{ totalesVenta.subtotal.toFixed(2) }}</span></div>
-                <div class="flex justify-between text-[10px] font-bold text-neutral-500 uppercase"><span>IVA (16%)</span> <span class="text-white">{{ ventaForm.currency }} {{ totalesVenta.iva.toFixed(2) }}</span></div>
-                <div v-if="totalesVenta.igtf > 0" class="flex justify-between text-[10px] font-bold text-indigo-400 uppercase"><span>IGTF (3%)</span> <span>{{ ventaForm.currency }} {{ totalesVenta.igtf.toFixed(2) }}</span></div>
+            <div class="pt-6 border-t border-white/10 grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div class="space-y-4">
+                <div class="p-4 bg-brand-navy-dark/50 rounded-2xl border border-white/5 space-y-2">
+                  <p class="text-[8px] font-black text-neutral-500 uppercase tracking-widest mb-2">Previsualización Multimoneda</p>
+                  <div class="flex justify-between items-center text-[10px] font-bold">
+                    <span class="text-emerald-400">TOTAL USD:</span>
+                    <span class="text-white">$ {{ totalesVenta.equivalents.USD.toFixed(2) }}</span>
+                  </div>
+                  <div class="flex justify-between items-center text-[10px] font-bold">
+                    <span class="text-brand-royal">TOTAL VES:</span>
+                    <span class="text-white">Bs. {{ totalesVenta.equivalents.VES.toLocaleString() }}</span>
+                  </div>
+                  <div class="flex justify-between items-center text-[10px] font-bold">
+                    <span class="text-amber-400">TOTAL COP:</span>
+                    <span class="text-white">$ {{ (totalesVenta.equivalents.COP / 1000).toFixed(0) }}k ({{ totalesVenta.equivalents.COP.toLocaleString() }})</span>
+                  </div>
+                </div>
+                <div class="flex justify-between text-[10px] font-bold text-neutral-500 uppercase px-2"><span>Subtotal (Base)</span> <span class="text-white">{{ ventaForm.currency }} {{ totalesVenta.subtotal.toFixed(2) }}</span></div>
+                <div class="flex justify-between text-[10px] font-bold text-neutral-500 uppercase px-2"><span>IVA (16%)</span> <span class="text-white">{{ ventaForm.currency }} {{ totalesVenta.iva.toFixed(2) }}</span></div>
+                <div v-if="totalesVenta.igtf > 0" class="flex justify-between text-[10px] font-bold text-indigo-400 uppercase px-2"><span>IGTF (3%)</span> <span>{{ ventaForm.currency }} {{ totalesVenta.igtf.toFixed(2) }}</span></div>
               </div>
+              
               <div class="flex flex-col items-end justify-center">
-                <div class="text-[10px] font-black text-brand-royal uppercase tracking-[0.2em] mb-1">Total a Pagar</div>
-                <div class="text-4xl font-black text-white italic tracking-tighter">{{ ventaForm.currency }} {{ totalesVenta.total.toFixed(2) }}</div>
+                <div class="text-[10px] font-black text-brand-royal uppercase tracking-[0.2em] mb-1">Total a Cobrar</div>
+                <div class="text-5xl font-black text-white italic tracking-tighter">{{ ventaForm.currency }} {{ totalesVenta.total.toFixed(2) }}</div>
               </div>
             </div>
 
