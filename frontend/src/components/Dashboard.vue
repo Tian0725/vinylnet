@@ -177,7 +177,7 @@ const abrirModalVenta = async () => {
   ventaForm.value = {
     client_id: null, currency: 'USD', apply_iva: true, apply_igtf: true, notes: '', items: []
   };
-  totalesVenta.value = { subtotal: 0, iva: 0, igtf: 0, total: 0 };
+  totalesVenta.value = { subtotal: 0, iva: 0, igtf: 0, total: 0, equivalents: { USD: 0, VES: 0, COP: 0 } };
   modalVentaAbierto.value = true;
   
   try {

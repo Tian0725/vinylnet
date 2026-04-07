@@ -17,7 +17,7 @@ type ExchangeRate struct {
 func GetActiveRates(c *gin.Context) {
 	// Obtener las tasas de USD/VES y USD/COP (o las que estén activas)
 	rows, err := config.DB.Query(`
-		SELECT id, currency_code, rate, source 
+		SELECT id, to_currency, rate, source 
 		FROM exchange_rates 
 		WHERE is_active = true 
 		ORDER BY id DESC`)
