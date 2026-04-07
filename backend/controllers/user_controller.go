@@ -11,6 +11,7 @@ type UsuarioResponse struct {
 	Username       string `json:"username"`
 	Rol            string `json:"rol"`
 	Activo         bool   `json:"activo"`
+	CreadoAt       string `json:"creado_at"`
 }
 
 type UserRequest struct {
@@ -22,8 +23,12 @@ type UserRequest struct {
 
 // GET /usuarios
 func GetUsuarios(c *gin.Context) {
-	query := `SELECT u.id, u.nombre_completo, u.username, r.nombre, u.activo 
-	          FROM usuarios u JOIN roles r ON u.rol_id = r.id ORDER BY u.id ASC`
+	query := `
+        SELECT u.id, u.nombre_completo, u.username, r.nombre, u.activo 
+        FROM usuarios u
+        JOIN roles r ON u.rol_id = r.id 
+        ORDER BY u.id ASC`
+
 	rows, err := config.DB.Query(query)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -34,7 +39,9 @@ func GetUsuarios(c *gin.Context) {
 	var usuarios []UsuarioResponse
 	for rows.Next() {
 		var u UsuarioResponse
-		rows.Scan(&u.ID, &u.NombreCompleto, &u.Username, &u.Rol, &u.Activo)
+		if err := rows.Scan(&u.ID, &u.NombreCompleto, &u.Username, &u.Rol, &u.Activo); err != nil {
+			continue
+		}
 		usuarios = append(usuarios, u)
 	}
 	c.JSON(200, usuarios)
