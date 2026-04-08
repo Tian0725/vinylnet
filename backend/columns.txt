@@ -1,0 +1,11 @@
+id
+documento_id
+producto_id
+cantidad
+precio_unitario
+costo_momento
+porcentaje_iva
+monto_iva_renglon
+porcentaje_descuento_renglon
+monto_descuento_renglon
+es_exento
