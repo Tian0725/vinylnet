@@ -24,18 +24,29 @@ const vistaActual = ref('inicio');
 const listaRoles = ref([]);        
 const cargando = ref(false);       
 
+// --- Estado de Devoluciones ---
+const searchResult = ref(null);
+const searchNum = ref('');
+const historialDevoluciones = ref([]);
+const modalDevolucionConfirmar = ref(false);
+const devolucionForm = ref({
+  original_id: null,
+  motivo: 'Garantía / Defecto',
+  detalles: []
+});
+
 // --- Lógica de CRUD de Usuarios ---
 const usuarios = ref([]);
 const roles = ref([]);
 const listaInvoices = ref([]);     
 const listaClientesValue = ref([]); 
 const listaProductosValue = ref([]); 
-const listaTasas = ref({}); // Nueva: Tasas de cambio (USD/VES, USD/COP)
+const listaTasas = ref({}); 
 const modalAbierto = ref(false);
 const rolModalAbierto = ref(false);
 const rolEditando = ref(false);
 const rolForm = ref({ id: null, nombre: '', descripcion: '' });
-const modalVentaAbierto = ref(false); // Nueva: Modal de venta
+const modalVentaAbierto = ref(false); 
 const API_URL = 'http://localhost:8080/api';
 
 // Formulario para Nuevo/Editar Usuario
@@ -60,10 +71,14 @@ const fetchUsuarios = async () => {
   }
 };
 
-// 2. Guardar Usuario (Create)
+// 2. Guardar Usuario (Create/Update)
 const guardarUsuario = async () => {
   try {
-    await axios.post(`${API_URL}/usuarios`, form.value);
+    if (form.value.id) {
+        await axios.put(`${API_URL}/usuarios/${form.value.id}`, form.value);
+    } else {
+        await axios.post(`${API_URL}/usuarios`, form.value);
+    }
     modalAbierto.value = false;
     resetForm();
     fetchUsuarios();
@@ -84,7 +99,6 @@ const eliminarUsuario = async (id) => {
     }
   }
 };
-
 
 const resetForm = () => {
   form.value = { id: null, nombre_completo: '', username: '', password: '', rol_id: 1 };
@@ -145,13 +159,10 @@ const cerrarRolModal = () => {
   resetRolForm();
 };
 
-// Obtener Roles de la DB
 const fetchRoles = async () => {
   try {
     const res = await axios.get(`${API_URL}/roles`);
     roles.value = res.data || [];
-    
-    // Opcional: Si hay roles, poner el primero por defecto en el form
     if (roles.value.length > 0 && !form.value.rol_id) {
       form.value.rol_id = roles.value[0].id;
     }
@@ -159,17 +170,21 @@ const fetchRoles = async () => {
     console.error("Error al obtener roles:", err);
   }
 };
+
 // --- Inicialización ---
 onMounted(() => {
-  const nombre = localStorage.getItem('usuario') || 'Jesus Sarmiento';
-  const rol = localStorage.getItem('rol') || 'Administrador';
+  const isLogged = localStorage.getItem('isLogged');
+  const nombre = localStorage.getItem('usuario') || (isLogged ? '' : 'Jesus Sarmiento');
+  const rol = localStorage.getItem('rol') || (isLogged ? '' : 'Administrador');
   
-  nombreUsuario.value = nombre;
-  rolUsuario.value = rol;
-  iniciales.value = nombre.split(' ').filter(n => n).map(n => n[0]).join('').toUpperCase().substring(0, 2);
+  nombreUsuario.value = nombre ? nombre : "Usuario Demo";
+  rolUsuario.value = rol ? rol : "Administrador";
+  iniciales.value = nombreUsuario.value.split(' ').filter(n => n).map(n => n[0]).join('').toUpperCase().substring(0, 2);
 
-  fetchUsuarios();
-  fetchRoles();
+  if (isLogged) {
+    fetchUsuarios();
+    fetchRoles();
+  }
 });
 
 // --- Funciones de Navegación ---
@@ -182,20 +197,20 @@ const navegar = (vista) => {
   if (window.innerWidth < 1024) mobileMenuVisible.value = false;
 };
 
-// --- Gestión de Vistas ---
 const cambiarVista = (nuevaVista) => {
   vistaActual.value = nuevaVista;
   if (nuevaVista === 'usuarios') {
     fetchUsuarios();
   } else if (nuevaVista === 'roles') {
-    obtenerRoles();
+    fetchRoles();
+  } else if (nuevaVista === 'ventas_devoluciones') {
+    fetchHistorialDevoluciones();
   } else if (nuevaVista.startsWith('ventas_')) {
-    const statusMap = {
-      'ventas_facturas': 'FINAL',
-      'ventas_devoluciones': 'RETURNED',
-      'ventas_anulaciones': 'VOIDED'
+    const tipoMap = {
+      'ventas_facturas': '1',
+      'ventas_facturas_nac': '5'
     };
-    fetchInvoices(statusMap[nuevaVista] || '');
+    fetchInvoices(tipoMap[nuevaVista] || '');
   }
   if (mobileMenuVisible.value) mobileMenuVisible.value = false;
 };
@@ -205,51 +220,92 @@ const logout = () => {
   window.location.href = '/';
 };
 
-
-
-
-
-const crearUsuario = async () => {
-  const nombre_completo = prompt("Nombre completo:");
-  if (!nombre_completo) return;
-  const username = prompt("Nombre de usuario:");
-  if (!username) return;
-  const password = prompt("Contraseña:");
-  if (!password) return;
-  const rol_id_str = prompt("ID de Rol (1: Sistemas, etc.):");
-  const rol_id = parseInt(rol_id_str);
-  if (isNaN(rol_id)) return alert("ID de rol inválido");
-
-  try {
-    const response = await fetch('http://localhost:8080/api/usuarios', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre_completo, username, password, rol_id })
-    });
-    if (response.ok) {
-      alert("Usuario creado con éxito");
-      obtenerUsuarios();
-    } else {
-      const data = await response.json();
-      alert("Error: " + (data.error || "No se pudo crear"));
-    }
-  } catch (error) {
-    console.error("Error creando usuario:", error);
-  }
-};
-
-
-const fetchInvoices = async (status = '') => {
+const fetchInvoices = async (tipo = '') => {
   cargando.value = true;
   try {
-    const res = await axios.get(`${API_URL}/invoices?status=${status}`);
+    const res = await axios.get(`${API_URL}/documentos?tipo=${tipo}`);
     listaInvoices.value = res.data || [];
   } catch (err) {
-    console.error("Error al obtener facturas:", err);
+    console.error("Error al obtener documentos:", err);
   } finally {
     cargando.value = false;
   }
 };
+
+const buscarFacturaDevolucion = async () => {
+  if (!searchNum.value) return;
+  cargando.value = true;
+  try {
+    const res = await axios.get(`${API_URL}/documentos/buscar?numero=${searchNum.value}`);
+    searchResult.value = res.data;
+  } catch (err) {
+    alert(err.response?.data?.error || "Error en la búsqueda");
+    searchResult.value = null;
+  } finally {
+    cargando.value = false;
+  }
+};
+
+const prepararDevolucion = () => {
+  if (!searchResult.value) return;
+  devolucionForm.value = {
+    original_id: searchResult.value.documento.id,
+    motivo: 'Garantía / Defecto',
+    detalles: searchResult.value.detalles.map(d => ({
+      producto_id: d.producto_id,
+      nombre: d.producto_nombre,
+      cantidad: d.cantidad,
+      seleccionado: true
+    }))
+  };
+  modalDevolucionConfirmar.value = true;
+};
+
+const ejecutarDevolucion = async () => {
+  const itemsParaDevolver = devolucionForm.value.detalles.filter(i => i.seleccionado);
+  if (itemsParaDevolver.length === 0) return alert("Selecciona al menos un ítem");
+
+  try {
+    const res = await axios.post(`${API_URL}/documentos/devolucion`, {
+      original_id: devolucionForm.value.original_id,
+      motivo: devolucionForm.value.motivo,
+      detalles: itemsParaDevolver.map(i => ({
+        producto_id: i.producto_id,
+        cantidad: i.cantidad
+      }))
+    });
+    alert(res.data.message);
+    modalDevolucionConfirmar.value = false;
+    searchResult.value = null;
+    cambiarVista('ventas_devoluciones');
+  } catch (err) {
+    alert("Error al procesar devolución");
+  }
+};
+
+const fetchHistorialDevoluciones = async () => {
+  cargando.value = true;
+  try {
+    const res = await axios.get(`${API_URL}/devoluciones/historial`);
+    historialDevoluciones.value = res.data || [];
+  } catch (err) {
+    console.error(err);
+  } finally {
+    cargando.value = false;
+  }
+};
+
+// Formulario de Venta
+const ventaForm = ref({
+  client_id: null,
+  currency: 'USD',
+  apply_iva: true,
+  apply_igtf: true,
+  notes: '',
+  items: []
+});
+
+const totalesVenta = ref({ subtotal: 0, iva: 0, igtf: 0, total: 0, equivalents: { USD: 0, VES: 0, COP: 0 } });
 
 const abrirModalVenta = async () => {
   ventaForm.value = {
@@ -267,7 +323,6 @@ const abrirModalVenta = async () => {
     listaClientesValue.value = c.data || [];
     listaProductosValue.value = p.data || [];
     
-    // Organizar tasas en objeto { 'VES': 36.5, 'COP': 3950 }
     const ratesObj = {};
     (r.data || []).forEach(rate => {
       ratesObj[rate.currency_code] = rate.rate;
@@ -285,16 +340,6 @@ const actualizarPrecioItem = (idx) => {
   }
 };
 
-// Formulario de Venta
-const ventaForm = ref({
-  client_id: null,
-  currency: 'USD',
-  apply_iva: true,
-  apply_igtf: true,
-  notes: '',
-  items: []
-});
-
 const agregarItemVenta = () => {
   ventaForm.value.items.push({ product_id: null, quantity: 1, price: 0 });
 };
@@ -302,8 +347,6 @@ const agregarItemVenta = () => {
 const eliminarItemVenta = (index) => {
   ventaForm.value.items.splice(index, 1);
 };
-
-const totalesVenta = ref({ subtotal: 0, iva: 0, igtf: 0, total: 0, equivalents: { USD: 0, VES: 0, COP: 0 } });
 
 const calcularTotales = () => {
   let sub = 0;
@@ -316,7 +359,6 @@ const calcularTotales = () => {
   
   const finalTotal = sub + iva + igtf;
   
-  // Calcular equivalencias
   const rates = listaTasas.value;
   let totalUSD = 0;
   
@@ -342,49 +384,15 @@ const guardarVenta = async () => {
     return alert("Completa los datos del cliente y al menos un producto");
   }
   try {
-    const res = await axios.post(`${API_URL}/invoices`, {
+    await axios.post(`${API_URL}/invoices`, {
       ...ventaForm.value,
-      user_id: 1 // TODO: get from logged user
+      user_id: 1 
     });
-    alert(res.data.message);
+    alert("Venta registrada con éxito");
     modalVentaAbierto.value = false;
     cambiarVista('ventas_facturas');
   } catch (err) {
     alert("Error al guardar venta");
-  }
-};
-
-const obtenerRoles = async () => {
-  cargando.value = true;
-  try {
-    const response = await fetch('http://localhost:8080/api/roles');
-    if (response.ok) {
-      listaRoles.value = await response.json();
-    }
-  } catch (error) {
-    console.error("Error cargando roles:", error);
-  } finally {
-    cargando.value = false;
-  }
-};
-
-const crearRol = async () => {
-  const nombre = prompt("Nombre del nuevo rol:");
-  if (!nombre) return;
-  const descripcion = prompt("Descripción (opcional):");
-
-  try {
-    const response = await fetch('http://localhost:8080/api/roles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, descripcion })
-    });
-    if (response.ok) {
-      alert("Rol creado con éxito");
-      obtenerRoles();
-    }
-  } catch (error) {
-    console.error("Error creando rol:", error);
   }
 };
 
@@ -417,7 +425,7 @@ const formatearFecha = (fechaRaw) => {
       <nav class="p-6 h-[calc(100vh-5rem)] overflow-y-auto space-y-2 scrollbar-none">
         <div class="px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-600">Operaciones</div>
         
-        <button @click="navegar('dashboard')" class="w-full flex items-center px-4 py-3 hover:bg-white/5 rounded-2xl transition-all group">
+        <button @click="navegar('inicio')" class="w-full flex items-center px-4 py-3 hover:bg-white/5 rounded-2xl transition-all group">
           <span class="mr-3 text-lg group-hover:scale-110 transition-transform">🏠</span>
           <span class="font-bold text-sm">Inicio</span>
         </button>
@@ -436,32 +444,6 @@ const formatearFecha = (fechaRaw) => {
         </div>
 
         <div class="space-y-1">
-          <button @click="toggleSubmenu('transacciones')" class="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 rounded-2xl transition-all group">
-            <div class="flex items-center">
-              <span class="mr-3 text-lg text-neutral-400">📦</span>
-              <span class="font-bold text-sm text-neutral-300">Transacciones</span>
-            </div>
-            <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': menus.transacciones }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
-          </button>
-          <div v-show="menus.transacciones" class="ml-9 border-l border-white/5 pl-4 space-y-3 pt-2">
-            <div v-for="(sub, subKey) in {
-              'Inventario': { key: 'inventario_sub', icon: '📋', items: ['➕ Cargos', '➖ Descargos', '↔️ Transferencia'] },
-              'Mov. de Caja': { key: 'caja_sub', icon: '📠', items: ['➕ Préstamos', '➖ Avances'] },
-              'Clientes': { key: 'clientes_sub', icon: '👤', items: ['💰 Cuentas x Cobrar'] },
-              'Bancos': { key: 'bancos_sub', icon: '🏦', items: ['💸 Movimientos'] }
-            }" :key="subKey">
-              <button @click="toggleSubmenu(sub.key)" class="w-full flex items-center justify-between text-xs font-bold text-neutral-400 hover:text-white">
-                <span class="flex items-center"><span class="mr-2">{{ sub.icon }}</span> {{ subKey }}</span>
-                <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-180': menus[sub.key] }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
-              </button>
-              <div v-show="menus[sub.key]" class="ml-4 border-l border-white/5 pl-3 space-y-1 mt-1">
-                <button v-for="item in sub.items" :key="item" class="w-full text-left py-1.5 text-[10px] text-neutral-600 hover:text-brand-royal transition-colors">{{ item }}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="space-y-1">
           <button @click="toggleSubmenu('Ventas')" class="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 rounded-2xl transition-all group">
             <div class="flex items-center">
               <span class="mr-3 text-lg text-neutral-400">🛒</span>
@@ -473,7 +455,6 @@ const formatearFecha = (fechaRaw) => {
             <button @click="cambiarVista('ventas_facturas')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">🧾 Facturas</button>
             <button @click="cambiarVista('ventas_facturas_nac')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">🧾 Facturas Nac.</button>
             <button @click="cambiarVista('ventas_devoluciones')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">↩️ Devoluciones</button>
-            <button @click="cambiarVista('ventas_devoluciones_nac')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">↩️ Devoluciones Nac.</button>
             <button @click="cambiarVista('ventas_anulaciones')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">🚫 Anulaciones</button>
           </div>
         </div>
@@ -490,17 +471,6 @@ const formatearFecha = (fechaRaw) => {
           <div v-show="menus.Configuracion" class="ml-9 border-l border-white/5 pl-4 space-y-1">
             <button @click="cambiarVista('usuarios')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">Usuarios</button>
             <button @click="cambiarVista('roles')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">Roles</button>
-            <button
-              v-for="item in ['Permisos', 'Empresas', 'Sucursales']"
-              :key="item"
-              @click="item === 'Roles' ? navegar('roles') : null"
-              class="w-full text-left px-3 py-2 text-xs font-semibold transition-colors"
-              :class="item === 'Roles' ? (vistaActual === 'roles' ? 'text-brand-royal' : 'text-neutral-500 hover:text-white') : 'text-neutral-500 hover:text-white'"
-            >
-              
-              {{ item }}
-            
-            </button>
           </div>
         </div>
 
@@ -531,119 +501,181 @@ const formatearFecha = (fechaRaw) => {
       <main class="flex-1 overflow-y-auto p-6 lg:p-10 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-brand-navy-base/20 via-brand-navy-dark to-brand-navy-dark">
         <div class="max-w-7xl mx-auto">
           
-          <!-- VISTA: INICIO -->
           <div v-if="vistaActual === 'inicio'" class="space-y-10">
-            <!-- View Title -->
             <div class="flex flex-col space-y-1">
               <h1 class="text-3xl font-black text-white tracking-tighter uppercase italic">Panel de Control</h1>
               <p class="text-sm font-medium text-neutral-500 uppercase tracking-widest">Resumen ejecutivo del sistema</p>
             </div>
 
-            <!-- Stats Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div v-for="stat in [
                 { label: 'Ventas del Día', value: '$0.00', icon: '💰', color: 'from-emerald-500/20 to-emerald-500/5', border: 'border-emerald-500/20' },
                 { label: 'Equipos Activos', value: '0', icon: '💻', color: 'from-brand-royal/20 to-brand-royal/5', border: 'border-brand-royal/20' },
                 { label: 'Alertas Sistema', value: 'Ninguna', icon: '⚠️', color: 'from-amber-500/20 to-amber-500/5', border: 'border-amber-500/20' },
-                { label: 'Transacciones', value: '1,240', icon: '📊', color: 'from-purple-500/20 to-purple-500/5', border: 'border-purple-500/20' }
-              ]" :key="stat.label" 
-                class="relative group"
-              >
-                <div :class="`h-full p-6 rounded-3xl bg-neutral-900/50 border ${stat.border} overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50`">
-                  <div :class="`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-100 transition-opacity`"></div>
-                  <div class="relative flex flex-col justify-between h-full space-y-6">
-                    <div class="flex items-center justify-between">
-                      <span class="text-2xl">{{ stat.icon }}</span>
-                      <span class="text-[10px] font-black uppercase tracking-widest text-neutral-500 group-hover:text-white transition-colors">{{ stat.label }}</span>
-                    </div>
-                    <div class="text-2xl font-black text-white tracking-tight">{{ stat.value }}</div>
-                  </div>
+                { label: 'Usuarios en Sistema', value: usuarios.length, icon: '👤', color: 'from-purple-500/20 to-purple-500/5', border: 'border-purple-500/20' }
+              ]" :key="stat.label" class="relative group">
+                <div :class="`h-full p-6 rounded-3xl bg-neutral-900/50 border ${stat.border} overflow-hidden transition-all duration-300` text-white">
+                  <div class="text-2xl mb-4">{{ stat.icon }}</div>
+                  <div class="text-xs font-bold text-neutral-500 uppercase">{{ stat.label }}</div>
+                  <div class="text-2xl font-black">{{ stat.value }}</div>
                 </div>
               </div>
             </div>
           </div>
-          <div v-if="vistaActual === 'dashboard'" class="space-y-10">
-            <div class="flex flex-col space-y-1">
-              <h1 class="text-3xl font-black text-white tracking-tighter uppercase italic">Panel de Control</h1>
-              <p class="text-sm font-medium text-neutral-500 uppercase tracking-widest">Resumen ejecutivo del sistema</p>
+
+          <!-- VISTA: TRANSACCIONES (FACTURAS / NACIONALES) -->
+          <div v-if="vistaActual.startsWith('ventas_') && vistaActual !== 'ventas_devoluciones'" class="space-y-6">
+            <div class="flex justify-between items-center">
+              <div>
+                <h2 class="text-2xl font-black text-white italic uppercase">{{ vistaActual === 'ventas_facturas' ? 'Facturación Estándar' : 'Facturación Nacional' }}</h2>
+                <p class="text-[10px] text-neutral-500 font-bold uppercase tracking-[0.3em]">Lista Maestra de Documentos</p>
+              </div>
+              <button @click="abrirModalVenta" class="bg-brand-royal px-6 py-3 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest hover:scale-105 transition-all">+ Nueva Factura</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-               <div v-for="stat in [{ label: 'Usuarios en DB', value: usuarios.length, icon: '👤', color: 'from-brand-royal/20 to-brand-royal/5', border: 'border-brand-royal/20' }]" :key="stat.label" class="p-6 rounded-3xl bg-neutral-900/50 border border-white/5">
-                  <div class="text-2xl mb-2">{{ stat.icon }}</div>
-                  <div class="text-xs font-bold text-neutral-500 uppercase">{{ stat.label }}</div>
-                  <div class="text-2xl font-black text-white">{{ stat.value }}</div>
-               </div>
+
+            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+               <table class="w-full text-left">
+                <thead class="bg-white/5 text-[10px] uppercase text-neutral-500 font-bold tracking-widest">
+                  <tr>
+                    <th class="p-5">Número</th>
+                    <th class="p-5">Cliente</th>
+                    <th class="p-5">Fecha</th>
+                    <th class="p-5 text-right">Monto Total</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                  <tr v-for="doc in listaInvoices" :key="doc.id" class="hover:bg-white/5 transition-colors">
+                    <td class="p-5 font-bold text-white text-sm">#{{ doc.numero_documento }}</td>
+                    <td class="p-5 text-neutral-400 font-semibold text-xs">{{ doc.cliente_nombre?.String || 'Cliente Final' }}</td>
+                    <td class="p-5 text-neutral-400 text-xs">{{ doc.fecha_emision }}</td>
+                    <td class="p-5 text-right font-black text-white text-sm">$ {{ doc.total_neto.toLocaleString() }}</td>
+                  </tr>
+                   <tr v-if="listaInvoices.length === 0">
+                    <td colspan="4" class="p-10 text-center text-neutral-600 font-bold uppercase text-xs italic">No hay documentos registrados para esta sección</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
+          <!-- VISTA: DEVOLUCIONES -->
+          <div v-if="vistaActual === 'ventas_devoluciones'" class="space-y-6">
+            <div class="flex justify-between items-center">
+              <div>
+                <h2 class="text-2xl font-black text-white italic uppercase">Historial de Devoluciones</h2>
+                <p class="text-[10px] text-neutral-500 font-bold uppercase tracking-[0.3em]">Gestión de Notas de Crédito</p>
+              </div>
+            </div>
+
+            <div class="bg-white/5 p-8 rounded-[32px] border border-white/10 space-y-4 shadow-xl">
+              <h3 class="text-xs font-black text-brand-royal uppercase italic tracking-widest">Ejecutar Nueva Devolución</h3>
+              <div class="flex space-x-4">
+                <input v-model="searchNum" type="text" placeholder="Ej: FAC-0001 o FAN-0001" class="flex-1 bg-brand-navy-dark border border-white/10 rounded-2xl px-6 py-4 text-sm text-white outline-none focus:ring-2 ring-brand-royal transition-all">
+                <button @click="buscarFacturaDevolucion" class="bg-brand-royal px-10 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-brand-royal/80 transition-all">Consultar</button>
+              </div>
+              
+              <div v-if="searchResult" class="mt-6 p-6 bg-brand-navy-dark rounded-3xl border border-brand-royal/30 flex justify-between items-center animate-in fade-in zoom-in duration-300 shadow-2xl">
+                <div>
+                  <p class="text-[8px] font-black text-brand-royal uppercase tracking-[0.3em] mb-1">Documento Encontrado</p>
+                  <p class="text-xl font-bold text-white italic uppercase tracking-tighter">{{ searchResult.documento.numero_documento }} — {{ searchResult.documento.cliente_nombre?.String || 'Cliente Especial' }}</p>
+                  <p class="text-[10px] text-neutral-500 font-bold">MONTO BASE: $ {{ searchResult.documento.total_neto.toLocaleString() }} | FECHA: {{ searchResult.documento.fecha_emision }}</p>
+                </div>
+                <button @click="prepararDevolucion" class="bg-brand-royal/10 hover:bg-brand-royal text-brand-royal hover:text-white px-8 py-3 rounded-2xl text-[10px] font-black transition-all border border-brand-royal/20 uppercase tracking-widest">Proceder a Devolución</button>
+              </div>
+            </div>
+
+            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+              <table class="w-full text-left">
+                <thead class="bg-white/5 text-[10px] uppercase text-neutral-500 font-bold tracking-widest">
+                  <tr>
+                    <th class="p-5">Número DEV</th>
+                    <th class="p-5">Ref. Original</th>
+                    <th class="p-5">Motivo</th>
+                    <th class="p-5">Fecha</th>
+                    <th class="p-5 text-right">Monto</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                   <tr v-for="doc in historialDevoluciones" :key="doc.id" class="hover:bg-white/5 transition-colors">
+                    <td class="p-5 font-bold text-white text-sm">#{{ doc.numero_documento }}</td>
+                    <td class="p-5 text-amber-500 font-black text-xs italic">{{ doc.numero_referencia?.String || '-' }}</td>
+                    <td class="p-5 text-neutral-400 font-semibold text-xs">{{ doc.motivo?.String || 'Garantía' }}</td>
+                    <td class="p-5 text-neutral-400 text-xs">{{ doc.fecha_emision }}</td>
+                    <td class="p-5 text-right font-black text-white text-sm">$ {{ doc.total_neto.toLocaleString() }}</td>
+                  </tr>
+                  <tr v-if="historialDevoluciones.length === 0">
+                    <td colspan="5" class="p-10 text-center text-neutral-600 font-bold uppercase text-xs italic">No hay historial de devoluciones</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- VISTA: USUARIOS -->
           <div v-if="vistaActual === 'usuarios'" class="space-y-6">
             <div class="flex justify-between items-center">
               <div>
-                <h2 class="text-2xl font-black text-white italic uppercase">Gestión de Usuarios</h2>
-                <p class="text-xs text-neutral-500 font-bold uppercase tracking-widest">Administración de accesos a Vinylnet</p>
+                <h2 class="text-2xl font-black text-white italic uppercase">Usuarios Sistema</h2>
+                <p class="text-[10px] text-neutral-500 font-bold uppercase tracking-[0.3em]">Administración de Accesos</p>
               </div>
-              <button @click="modalAbierto = true" class="bg-brand-royal hover:bg-brand-royal/80 text-white px-6 py-2 rounded-xl font-bold text-xs transition-all shadow-lg shadow-brand-royal/20">
-                + NUEVO USUARIO
-              </button>
+              <button @click="modalAbierto = true" class="bg-brand-royal px-6 py-3 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest">+ Nuevo Usuario</button>
             </div>
 
-            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-md">
-              <table class="w-full text-left border-collapse">
+            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+               <table class="w-full text-left">
                 <thead class="bg-white/5 text-[10px] uppercase text-neutral-500 font-bold tracking-widest">
                   <tr>
                     <th class="p-5">Nombre</th>
-                    <th class="p-5">Usuario</th>
+                    <th class="p-5">Username</th>
                     <th class="p-5">Rol</th>
                     <th class="p-5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
-                  <tr v-for="user in usuarios" :key="user.id" class="hover:bg-white/5 transition-colors">
-                    <td class="p-5 font-bold text-white text-sm">{{ user.nombre_completo || user.nombre_complet }}</td>
-                    <td class="p-5 text-brand-royal font-mono text-xs">@{{ user.username }}</td>
-                    <td class="p-5"><span class="px-3 py-1 bg-brand-royal/10 text-brand-royal text-[10px] font-bold rounded-full">{{ user.rol }}</span></td>
-                    <td class="p-5 text-right">
-                      <button @click="eliminarUsuario(user.id)" class="text-red-400 hover:text-red-300 text-xs font-bold uppercase transition-colors">Eliminar</button>
+                  <tr v-for="u in usuarios" :key="u.id" class="hover:bg-white/5 transition-colors">
+                    <td class="p-5 font-bold text-white text-sm">{{ u.nombre_completo }}</td>
+                    <td class="p-5 text-neutral-400 font-semibold text-xs">{{ u.username }}</td>
+                    <td class="p-5 text-neutral-400 text-xs">{{ u.rol_nombre }}</td>
+                    <td class="p-5 text-right space-x-3">
+                        <button @click="form = {...u}; modalAbierto = true" class="text-brand-royal text-[10px] font-black uppercase hover:text-white">Editar</button>
+                        <button @click="eliminarUsuario(u.id)" class="text-red-500 text-[10px] font-black uppercase hover:text-red-400">Borrar</button>
                     </td>
                   </tr>
                 </tbody>
               </table>
-              <div v-if="cargando" class="p-10 text-center text-brand-royal animate-pulse uppercase font-black">Sincronizando con PostgreSQL...</div>
             </div>
           </div>
 
+          <!-- VISTA: ROLES -->
           <div v-if="vistaActual === 'roles'" class="space-y-6">
             <div class="flex justify-between items-center">
               <div>
-                <h2 class="text-2xl font-black text-white italic uppercase">Gestión de Roles</h2>
-                <p class="text-xs text-neutral-500 font-bold uppercase tracking-widest">Crear, editar o eliminar roles del sistema</p>
+                <h2 class="text-2xl font-black text-white italic uppercase">Roles y Permisos</h2>
+                <p class="text-[10px] text-neutral-500 font-bold uppercase tracking-[0.3em]">Perfiles de Seguridad</p>
               </div>
-              <button @click="abrirNuevoRol" class="bg-brand-royal hover:bg-brand-royal/80 text-white px-6 py-2 rounded-xl font-bold text-xs transition-all shadow-lg shadow-brand-royal/20">
-                + NUEVO ROL
-              </button>
+              <button @click="abrirNuevoRol" class="bg-brand-royal px-6 py-3 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest">+ Crear Rol</button>
             </div>
 
-            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-md">
-              <table class="w-full text-left border-collapse">
+            <div class="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+               <table class="w-full text-left">
                 <thead class="bg-white/5 text-[10px] uppercase text-neutral-500 font-bold tracking-widest">
                   <tr>
-                    <th class="p-5">Nombre</th>
+                    <th class="p-5">Rol</th>
                     <th class="p-5">Descripción</th>
                     <th class="p-5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
-                  <tr v-for="rol in roles" :key="rol.id" class="hover:bg-white/5 transition-colors">
-                    <td class="p-5 font-bold text-white text-sm">{{ rol.nombre }}</td>
-                    <td class="p-5 text-neutral-400 text-sm">{{ rol.descripcion || 'Sin descripción' }}</td>
-                    <td class="p-5 text-right space-x-2">
-                      <button @click="editarRol(rol)" class="text-brand-royal hover:text-white text-xs font-bold uppercase transition-colors">Editar</button>
-                      <button @click="eliminarRol(rol.id)" class="text-red-400 hover:text-red-300 text-xs font-bold uppercase transition-colors">Eliminar</button>
+                  <tr v-for="r in roles" :key="r.id" class="hover:bg-white/5 transition-colors">
+                    <td class="p-5 font-bold text-white text-sm">{{ r.nombre }}</td>
+                    <td class="p-5 text-neutral-400 font-semibold text-xs">{{ r.descripcion || '-' }}</td>
+                    <td class="p-5 text-right space-x-3">
+                        <button @click="editarRol(r)" class="text-brand-royal text-[10px] font-black uppercase hover:text-white">Editar</button>
+                        <button @click="eliminarRol(r.id)" class="text-red-500 text-[10px] font-black uppercase hover:text-red-400">Borrar</button>
                     </td>
                   </tr>
                 </tbody>
               </table>
-              <div v-if="roles.length === 0" class="p-10 text-center text-brand-royal animate-pulse uppercase font-black">No hay roles registrados.</div>
             </div>
           </div>
 
@@ -651,157 +683,40 @@ const formatearFecha = (fechaRaw) => {
       </main>
     </div>
 
+    <!-- MODAL: USUARIO -->
     <div v-if="modalAbierto" class="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
       <div class="bg-brand-navy-base border border-white/10 w-full max-w-md rounded-3xl p-8 shadow-2xl">
-        <h3 class="text-xl font-black text-white italic uppercase mb-6 tracking-tighter">Registrar Nuevo Usuario</h3>
+        <h3 class="text-xl font-black text-white italic uppercase mb-6 tracking-tighter">Registrar Usuario</h3>
         <div class="space-y-4">
           <div class="space-y-1">
             <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Nombre Completo</label>
             <input v-model="form.nombre_completo" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 ring-brand-royal/50 text-white">
           </div>
           <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-1">
-    <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Username</label>
-    <input v-model="form.username" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none text-white">
-  </div>
-
-  <div class="space-y-1">
-    <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Rol</label>
-    <select 
-      v-model="form.rol_id" 
-      class="w-full bg-brand-navy-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 ring-brand-royal/50"
-    >
-      <option v-if="roles.length === 0" disabled value="">Cargando roles...</option>
-      
-      <option v-for="rol in roles" :key="rol.id" :value="rol.id">
-        {{ rol.nombre }}
-      </option>
-    </select>
-  </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Username</label>
+              <input v-model="form.username" type="text" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none text-white">
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Rol</label>
+              <select v-model="form.rol_id" class="w-full bg-brand-navy-dark border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none">
+                <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.nombre }}</option>
+              </select>
+            </div>
           </div>
           <div class="space-y-1">
-            <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Contraseña Inicial</label>
+            <label class="text-[10px] font-bold text-neutral-500 uppercase ml-2">Contraseña</label>
             <input v-model="form.password" type="password" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none text-white">
           </div>
           <div class="flex space-x-3 pt-4">
-            <button @click="modalAbierto = false" class="flex-1 py-3 text-xs font-bold text-neutral-400 hover:text-white uppercase transition-colors">Cancelar</button>
+            <button @click="modalAbierto = false; resetForm()" class="flex-1 py-3 text-xs font-bold text-neutral-400 hover:text-white uppercase transition-colors">Cancelar</button>
             <button @click="guardarUsuario" class="flex-1 bg-brand-royal py-3 rounded-xl text-xs font-black text-white hover:bg-brand-royal/80 shadow-lg shadow-brand-royal/20 transition-all uppercase">Guardar</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- MODAL: NUEVA VENTA -->
-    <div v-if="modalVentaAbierto" class="fixed inset-0 bg-black/90 backdrop-blur-3xl z-[150] flex items-center justify-center p-4">
-      <div class="bg-brand-navy-base border border-white/10 w-full max-w-4xl rounded-[40px] p-10 shadow-2xl relative overflow-hidden">
-        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-royal via-indigo-500 to-purple-600"></div>
-        
-        <div class="flex justify-between items-start mb-10">
-          <div>
-            <h3 class="text-3xl font-black text-white italic uppercase tracking-tighter">Generar Nueva Transacción</h3>
-            <p class="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.3em]">Módulo de Facturación Automática</p>
-          </div>
-          <button @click="modalVentaAbierto = false" class="bg-white/5 hover:bg-red-500/20 p-3 rounded-2xl transition-colors text-neutral-400 hover:text-red-500">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <!-- Left: Client & Config -->
-          <div class="space-y-8">
-            <div class="space-y-4">
-              <label class="text-[10px] font-black text-brand-royal uppercase tracking-widest">1. Datos del Cliente</label>
-              <select v-model="ventaForm.client_id" @change="fetchAuxiliaresVenta" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white outline-none focus:ring-2 ring-brand-royal transition-all">
-                <option :value="null">Seleccionar Cliente...</option>
-                <option v-for="c in listaClientesValue" :key="c.id" :value="c.id">{{ c.name }} ({{ c.rif }})</option>
-              </select>
-            </div>
-
-            <div class="space-y-4">
-              <label class="text-[10px] font-black text-brand-royal uppercase tracking-widest">2. Configuración Fiscal</label>
-              <div class="bg-white/5 p-6 rounded-3xl space-y-4 border border-white/5">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-neutral-400">Moneda Cobro</span>
-                  <select v-model="ventaForm.currency" @change="calcularTotales" class="bg-brand-navy-dark text-[10px] font-black text-white border-0 rounded-lg px-2 py-1 outline-none">
-                    <option value="USD">USD ($)</option>
-                    <option value="VES">VES (Bs.)</option>
-                    <option value="COP">COP (Pesos)</option>
-                  </select>
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-neutral-400 italic">Aplicar IVA (16%)</span>
-                  <input type="checkbox" v-model="ventaForm.apply_iva" @change="calcularTotales" class="accent-brand-royal">
-                </div>
-                <div v-if="ventaForm.currency !== 'VES'" class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-indigo-400 italic">Aplicar IGTF (3%)</span>
-                  <input type="checkbox" v-model="ventaForm.apply_igtf" @change="calcularTotales" class="accent-indigo-500">
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Middle: Items -->
-          <div class="lg:col-span-2 space-y-8">
-            <div class="flex justify-between items-center">
-              <label class="text-[10px] font-black text-brand-royal uppercase tracking-widest">3. Detalle de Productos</label>
-              <button @click="agregarItemVenta" class="text-[10px] font-black text-emerald-400 hover:text-emerald-300 uppercase tracking-widest">+ Añadir Ítem</button>
-            </div>
-
-            <div class="max-h-[300px] overflow-y-auto space-y-3 pr-2 scrollbar-none">
-              <div v-for="(item, idx) in ventaForm.items" :key="idx" class="flex items-center space-x-3 group">
-                <select v-model="item.product_id" @change="actualizarPrecioItem(idx)" class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white outline-none">
-                  <option :value="null">Producto...</option>
-                  <option v-for="p in listaProductosValue" :key="p.id" :value="p.id">{{ p.name }} (${{ p.price }})</option>
-                </select>
-                <input type="number" v-model="item.quantity" @input="calcularTotales" placeholder="Cant" class="w-20 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white text-center">
-                <input type="number" v-model="item.price" @input="calcularTotales" placeholder="Precio" class="w-24 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white text-right">
-                <button @click="eliminarItemVenta(idx)" class="p-3 text-neutral-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 italic font-black">X</button>
-              </div>
-              <div v-if="ventaForm.items.length === 0" class="text-center py-10 border-2 border-dashed border-white/5 rounded-3xl text-neutral-600 text-xs font-bold uppercase italic">
-                La lista de productos está vacía
-              </div>
-            </div>
-
-            <!-- Totals Footer -->
-            <div class="pt-6 border-t border-white/10 grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div class="space-y-4">
-                <div class="p-4 bg-brand-navy-dark/50 rounded-2xl border border-white/5 space-y-2">
-                  <p class="text-[8px] font-black text-neutral-500 uppercase tracking-widest mb-2">Previsualización Multimoneda</p>
-                  <div class="flex justify-between items-center text-[10px] font-bold">
-                    <span class="text-emerald-400">TOTAL USD:</span>
-                    <span class="text-white">$ {{ totalesVenta.equivalents.USD.toFixed(2) }}</span>
-                  </div>
-                  <div class="flex justify-between items-center text-[10px] font-bold">
-                    <span class="text-brand-royal">TOTAL VES:</span>
-                    <span class="text-white">Bs. {{ totalesVenta.equivalents.VES.toLocaleString() }}</span>
-                  </div>
-                  <div class="flex justify-between items-center text-[10px] font-bold">
-                    <span class="text-amber-400">TOTAL COP:</span>
-                    <span class="text-white">$ {{ (totalesVenta.equivalents.COP / 1000).toFixed(0) }}k ({{ totalesVenta.equivalents.COP.toLocaleString() }})</span>
-                  </div>
-                </div>
-                <div class="flex justify-between text-[10px] font-bold text-neutral-500 uppercase px-2"><span>Subtotal (Base)</span> <span class="text-white">{{ ventaForm.currency }} {{ totalesVenta.subtotal.toFixed(2) }}</span></div>
-                <div class="flex justify-between text-[10px] font-bold text-neutral-500 uppercase px-2"><span>IVA (16%)</span> <span class="text-white">{{ ventaForm.currency }} {{ totalesVenta.iva.toFixed(2) }}</span></div>
-                <div v-if="totalesVenta.igtf > 0" class="flex justify-between text-[10px] font-bold text-indigo-400 uppercase px-2"><span>IGTF (3%)</span> <span>{{ ventaForm.currency }} {{ totalesVenta.igtf.toFixed(2) }}</span></div>
-              </div>
-              
-              <div class="flex flex-col items-end justify-center">
-                <div class="text-[10px] font-black text-brand-royal uppercase tracking-[0.2em] mb-1">Total a Cobrar</div>
-                <div class="text-5xl font-black text-white italic tracking-tighter">{{ ventaForm.currency }} {{ totalesVenta.total.toFixed(2) }}</div>
-              </div>
-            </div>
-
-            <div class="flex space-x-4 pt-6">
-              <button @click="modalVentaAbierto = false" class="flex-1 py-4 text-xs font-bold text-neutral-500 hover:text-white uppercase transition-colors">Abortar Operación</button>
-              <button @click="guardarVenta" class="flex-[2] bg-gradient-to-r from-brand-royal to-indigo-600 py-4 rounded-2xl text-xs font-black text-white hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand-royal/20 uppercase tracking-widest">
-                Confirmar y Registrar Venta
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
+    <!-- MODAL: ROL -->
     <div v-if="rolModalAbierto" class="fixed inset-0 bg-black/80 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
       <div class="bg-brand-navy-base border border-white/10 w-full max-w-md rounded-3xl p-8 shadow-2xl">
         <h3 class="text-xl font-black text-white italic uppercase mb-6 tracking-tighter">{{ rolEditando ? 'Editar Rol' : 'Crear Rol' }}</h3>
@@ -820,6 +735,100 @@ const formatearFecha = (fechaRaw) => {
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- MODAL: CONFIRMAR DEVOLUCION -->
+    <div v-if="modalDevolucionConfirmar" class="fixed inset-0 bg-black/90 backdrop-blur-3xl z-[200] flex items-center justify-center p-4">
+      <div class="bg-brand-navy-base border border-white/10 w-full max-w-2xl rounded-[40px] p-10 shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-red-600"></div>
+        
+        <div class="mb-8">
+          <h3 class="text-3xl font-black text-white italic uppercase tracking-tighter">Procesar Devolución</h3>
+          <p class="text-[10px] font-bold text-amber-500 uppercase tracking-[0.3em]">Nota de Crédito Vinculada</p>
+        </div>
+
+        <div class="space-y-6">
+          <div class="space-y-2">
+            <label class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Seleccionar Ítems a Devolver</label>
+            <div class="bg-white/5 rounded-3xl border border-white/5 overflow-hidden max-h-[250px] overflow-y-auto scrollbar-none">
+              <div v-for="(item, idx) in devolucionForm.detalles" :key="idx" class="flex items-center p-4 border-b border-white/5 last:border-0">
+                <input type="checkbox" v-model="item.seleccionado" class="w-5 h-5 accent-brand-royal rounded-lg mr-4">
+                <div class="flex-1">
+                  <p class="text-sm font-bold text-white">{{ item.nombre }}</p>
+                  <p class="text-[10px] text-neutral-500">Cantidad original: {{ item.cantidad }}</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                  <span class="text-[10px] font-black text-neutral-400 uppercase">DEVOLVER</span>
+                  <input type="number" v-model="item.cantidad" class="w-16 bg-brand-navy-dark border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white text-center">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Motivo de la Devolución</label>
+            <textarea v-model="devolucionForm.motivo" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white outline-none h-24 focus:ring-2 ring-amber-500/50"></textarea>
+          </div>
+
+          <div class="flex space-x-4 pt-6">
+            <button @click="modalDevolucionConfirmar = false" class="flex-1 py-4 text-xs font-bold text-neutral-500 hover:text-white uppercase transition-colors">Cancelar</button>
+            <button @click="ejecutarDevolucion" class="flex-[2] bg-gradient-to-r from-amber-500 to-orange-600 py-4 rounded-2xl text-xs font-black text-white hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-amber-500/20 uppercase tracking-widest">
+              Confirmar Devolución
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: NUEVA VENTA (RESTORED) -->
+    <div v-if="modalVentaAbierto" class="fixed inset-0 bg-black/90 backdrop-blur-3xl z-[150] flex items-center justify-center p-4">
+       <!-- Content from stashed version previously seen -->
+       <div class="bg-brand-navy-base border border-white/10 w-full max-w-4xl rounded-[40px] p-10 shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-royal via-indigo-500 to-purple-600"></div>
+        <div class="flex justify-between items-start mb-10">
+          <div>
+            <h3 class="text-3xl font-black text-white italic uppercase tracking-tighter">Generar Nueva Transacción</h3>
+            <p class="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.3em]">Módulo de Facturación Automática</p>
+          </div>
+          <button @click="modalVentaAbierto = false" class="bg-white/5 hover:bg-red-500/20 p-3 rounded-2xl transition-colors text-neutral-400 hover:text-red-500">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+          <div class="space-y-8">
+            <div class="space-y-4">
+              <label class="text-[10px] font-black text-brand-royal uppercase tracking-widest">1. Datos del Cliente</label>
+              <select v-model="ventaForm.client_id" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white outline-none">
+                <option :value="null">Seleccionar Cliente...</option>
+                <option v-for="c in listaClientesValue" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+            </div>
+            <div class="space-y-4">
+              <label class="text-[10px] font-black text-brand-royal uppercase tracking-widest">2. Configuración Fiscal</label>
+              <div class="bg-white/5 p-6 rounded-3xl space-y-4">
+                <div class="flex justify-between items-center"><span class="text-xs font-bold text-neutral-400">IVA (16%)</span><input type="checkbox" v-model="ventaForm.apply_iva" @change="calcularTotales"></div>
+                <div class="flex justify-between items-center"><span class="text-xs font-bold text-neutral-400">IGTF (3%)</span><input type="checkbox" v-model="ventaForm.apply_igtf" @change="calcularTotales"></div>
+              </div>
+            </div>
+          </div>
+          <div class="lg:col-span-2 space-y-8">
+            <div class="flex justify-between items-center"><label class="text-[10px] font-black text-brand-royal uppercase">3. Detalle</label><button @click="agregarItemVenta" class="text-[10px] font-black text-emerald-400 uppercase">+ Ítem</button></div>
+            <div class="max-h-[250px] overflow-y-auto space-y-3 pr-2 scrollbar-none">
+              <div v-for="(item, idx) in ventaForm.items" :key="idx" class="flex items-center space-x-3">
+                 <select v-model="item.product_id" @change="actualizarPrecioItem(idx)" class="flex-1 bg-white/5 border-0 rounded-2xl px-4 py-3 text-xs text-white">
+                   <option v-for="p in listaProductosValue" :key="p.id" :value="p.id">{{ p.name }}</option>
+                 </select>
+                 <input type="number" v-model="item.quantity" @input="calcularTotales" class="w-20 bg-white/5 border-0 rounded-2xl px-4 py-3 text-xs text-center text-white">
+                 <button @click="eliminarItemVenta(idx)" class="text-red-500 font-black">X</button>
+              </div>
+            </div>
+            <div class="pt-6 border-t border-white/10 flex justify-between items-center">
+               <div class="text-3xl font-black text-white italic">{{ ventaForm.currency }} {{ totalesVenta.total.toFixed(2) }}</div>
+               <button @click="guardarVenta" class="bg-brand-royal px-10 py-4 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest">Registrar Venta</button>
+            </div>
+          </div>
+        </div>
+       </div>
     </div>
 
   </div>

@@ -56,6 +56,12 @@ func main() {
 		api.GET("/clients", controllers.GetClients)
 		api.GET("/products", controllers.GetProducts)
 		api.GET("/rates", controllers.GetActiveRates)
+
+		// CANONICAL SYSTEM (documentos)
+		api.GET("/documentos", controllers.ListarDocumentos)
+		api.GET("/documentos/buscar", controllers.BuscarDocumento)
+		api.POST("/documentos/devolucion", controllers.CrearDevolucion)
+		api.GET("/devoluciones/historial", controllers.ListarHistorialDevoluciones)
 	}
 
 	// 4. Encender servidor

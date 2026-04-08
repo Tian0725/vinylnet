@@ -1,0 +1,23 @@
+- id | NULLABLE: NO | DEFAULT: nextval('documentos_id_seq'::regclass)
+- guid_global | NULLABLE: YES | DEFAULT: uuid_generate_v4()
+- numero_documento | NULLABLE: NO | DEFAULT: 
+- tipo_documento_id | NULLABLE: YES | DEFAULT: 
+- cliente_id | NULLABLE: YES | DEFAULT: 
+- sucursal_id | NULLABLE: YES | DEFAULT: 
+- fecha_emision | NULLABLE: YES | DEFAULT: CURRENT_TIMESTAMP
+- subtotal | NULLABLE: YES | DEFAULT: 
+- impuestos | NULLABLE: YES | DEFAULT: 
+- total_neto | NULLABLE: YES | DEFAULT: 
+- saldo_pendiente | NULLABLE: YES | DEFAULT: 
+- sincronizado_nube | NULLABLE: YES | DEFAULT: false
+- porcentaje_descuento_global | NULLABLE: YES | DEFAULT: 0
+- monto_descuento_global | NULLABLE: YES | DEFAULT: 0
+- base_imponible | NULLABLE: YES | DEFAULT: 0
+- monto_iva | NULLABLE: YES | DEFAULT: 0
+- monto_igtf | NULLABLE: YES | DEFAULT: 0
+- porcentaje_comision_vendedor | NULLABLE: YES | DEFAULT: 0
+- monto_comision_vendedor | NULLABLE: YES | DEFAULT: 0
+- monto_otros_impuestos | NULLABLE: YES | DEFAULT: 0
+- usuario_id | NULLABLE: YES | DEFAULT: 
+- numero_referencia | NULLABLE: YES | DEFAULT: 
+- documento_referencia_id | NULLABLE: YES | DEFAULT: 
