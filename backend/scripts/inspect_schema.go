@@ -29,14 +29,19 @@ func main() {
 	}
 	defer db.Close()
 
-	fmt.Println("--- Columns for documentos_detalles ---")
-	rows, err := db.Query("SELECT column_name FROM information_schema.columns WHERE table_name='documentos_detalles' ORDER BY ordinal_position")
-	if err != nil {
-		log.Fatal(err)
-	}
+	fmt.Println("--- Schema: documentos ---")
+	rows, _ := db.Query("SELECT column_name FROM information_schema.columns WHERE table_name='documentos'")
 	for rows.Next() {
 		var c string
 		rows.Scan(&c)
-		fmt.Println("COL:", c)
+		fmt.Printf("- %s\n", c)
+	}
+
+	fmt.Println("\n--- Schema: documentos_detalles ---")
+	rows2, _ := db.Query("SELECT column_name FROM information_schema.columns WHERE table_name='documentos_detalles'")
+	for rows2.Next() {
+		var c string
+		rows2.Scan(&c)
+		fmt.Printf("- %s\n", c)
 	}
 }

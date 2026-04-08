@@ -11,16 +11,12 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load("../.env"); err != nil {
-		fmt.Println("No se cargo .env de root")
-	}
-
+	godotenv.Load("../.env")
 	user := os.Getenv("DB_USER")
 	pass := os.Getenv("DB_PASSWORD")
 	name := os.Getenv("DB_NAME")
 	host := os.Getenv("DB_HOST")
 	port := os.Getenv("DB_PORT")
-
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, pass, name)
 
 	db, err := sql.Open("postgres", connStr)
@@ -29,14 +25,13 @@ func main() {
 	}
 	defer db.Close()
 
-	fmt.Println("--- Columns for documentos_detalles ---")
-	rows, err := db.Query("SELECT column_name FROM information_schema.columns WHERE table_name='documentos_detalles' ORDER BY ordinal_position")
-	if err != nil {
-		log.Fatal(err)
-	}
+	rows, _ := db.Query("SELECT column_name FROM information_schema.columns WHERE table_name='documentos_detalles'")
+	f, _ := os.Create("columns.txt")
+	defer f.Close()
+
 	for rows.Next() {
 		var c string
 		rows.Scan(&c)
-		fmt.Println("COL:", c)
+		f.WriteString(c + "\n")
 	}
 }
