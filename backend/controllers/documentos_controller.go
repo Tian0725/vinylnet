@@ -193,13 +193,21 @@ func CrearDevolucion(c *gin.Context) {
 
 // ListarHistorialDevoluciones devuelve las devoluciones realizadas
 func ListarHistorialDevoluciones(c *gin.Context) {
-	rows, err := config.DB.Query(`
+	tipo := c.Query("tipo")
+	query := `
 		SELECT d.id, d.numero_documento, d.numero_referencia, d.fecha_emision, d.total_neto, td.descripcion as tipo_descripcion
 		FROM documentos d
 		LEFT JOIN tipos_documentos td ON d.tipo_documento_id = td.id
 		WHERE d.tipo_documento_id IN (6, 7)
-		ORDER BY d.fecha_emision DESC
-	`)
+	`
+	args := []interface{}{}
+	if tipo != "" {
+		query += " AND d.tipo_documento_id = $1"
+		args = append(args, tipo)
+	}
+	query += " ORDER BY d.fecha_emision DESC"
+
+	rows, err := config.DB.Query(query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

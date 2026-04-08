@@ -10,9 +10,11 @@ import (
 )
 
 func main() {
-	// 1. Cargar configuración
+	// 1. Cargar configuración (Buscar en la carpeta actual o en la raíz)
 	if err := godotenv.Load(); err != nil {
-		log.Println("Aviso: No se encontró .env")
+		if err = godotenv.Load("../.env"); err != nil {
+			log.Println("Aviso: No se encontró .env")
+		}
 	}
 	config.ConnectDB()
 

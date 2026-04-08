@@ -204,7 +204,9 @@ const cambiarVista = (nuevaVista) => {
   } else if (nuevaVista === 'roles') {
     fetchRoles();
   } else if (nuevaVista === 'ventas_devoluciones') {
-    fetchHistorialDevoluciones();
+    fetchHistorialDevoluciones(6); // 6 = DEV (Estándar)
+  } else if (nuevaVista === 'ventas_devoluciones_nac') {
+    fetchHistorialDevoluciones(7); // 7 = DEVN (Nacional)
   } else if (nuevaVista.startsWith('ventas_')) {
     const tipoMap = {
       'ventas_facturas': '1',
@@ -234,9 +236,16 @@ const fetchInvoices = async (tipo = '') => {
 
 const buscarFacturaDevolucion = async () => {
   if (!searchNum.value) return;
+  
+  // Limpiar el número de búsqueda: quitar # si existe al inicio
+  let numClean = searchNum.value.trim();
+  if (numClean.startsWith('#')) {
+    numClean = numClean.substring(1);
+  }
+
   cargando.value = true;
   try {
-    const res = await axios.get(`${API_URL}/documentos/buscar?numero=${searchNum.value}`);
+    const res = await axios.get(`${API_URL}/documentos/buscar?numero=${numClean}`);
     searchResult.value = res.data;
   } catch (err) {
     alert(err.response?.data?.error || "Error en la búsqueda");
@@ -277,16 +286,18 @@ const ejecutarDevolucion = async () => {
     alert(res.data.message);
     modalDevolucionConfirmar.value = false;
     searchResult.value = null;
-    cambiarVista('ventas_devoluciones');
+    // Redirigir a la vista correspondiente
+    const targetVista = searchNum.value.startsWith('FAN') ? 'ventas_devoluciones_nac' : 'ventas_devoluciones';
+    cambiarVista(targetVista);
   } catch (err) {
     alert("Error al procesar devolución");
   }
 };
 
-const fetchHistorialDevoluciones = async () => {
+const fetchHistorialDevoluciones = async (tipo = '') => {
   cargando.value = true;
   try {
-    const res = await axios.get(`${API_URL}/devoluciones/historial`);
+    const res = await axios.get(`${API_URL}/devoluciones/historial?tipo=${tipo}`);
     historialDevoluciones.value = res.data || [];
   } catch (err) {
     console.error(err);
@@ -455,6 +466,7 @@ const formatearFecha = (fechaRaw) => {
             <button @click="cambiarVista('ventas_facturas')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">🧾 Facturas</button>
             <button @click="cambiarVista('ventas_facturas_nac')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">🧾 Facturas Nac.</button>
             <button @click="cambiarVista('ventas_devoluciones')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">↩️ Devoluciones</button>
+            <button @click="cambiarVista('ventas_devoluciones_nac')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">↩️ Devoluciones Nac.</button>
             <button @click="cambiarVista('ventas_anulaciones')" class="w-full text-left px-3 py-2 text-xs font-semibold text-neutral-500 hover:text-white transition-colors">🚫 Anulaciones</button>
           </div>
         </div>
@@ -514,17 +526,17 @@ const formatearFecha = (fechaRaw) => {
                 { label: 'Alertas Sistema', value: 'Ninguna', icon: '⚠️', color: 'from-amber-500/20 to-amber-500/5', border: 'border-amber-500/20' },
                 { label: 'Usuarios en Sistema', value: usuarios.length, icon: '👤', color: 'from-purple-500/20 to-purple-500/5', border: 'border-purple-500/20' }
               ]" :key="stat.label" class="relative group">
-                <div :class="`h-full p-6 rounded-3xl bg-neutral-900/50 border ${stat.border} overflow-hidden transition-all duration-300` text-white">
+                <div :class="`h-full p-6 rounded-3xl bg-neutral-900/50 border ${stat.border} overflow-hidden transition-all duration-300 text-white`">
                   <div class="text-2xl mb-4">{{ stat.icon }}</div>
                   <div class="text-xs font-bold text-neutral-500 uppercase">{{ stat.label }}</div>
-                  <div class="text-2xl font-black">{{ stat.value }}</div>
+                  <div class="text-2xl font-black">{{ stat.value }}</div> 
                 </div>
               </div>
             </div>
           </div>
 
           <!-- VISTA: TRANSACCIONES (FACTURAS / NACIONALES) -->
-          <div v-if="vistaActual.startsWith('ventas_') && vistaActual !== 'ventas_devoluciones'" class="space-y-6">
+          <div v-if="vistaActual === 'ventas_facturas' || vistaActual === 'ventas_facturas_nac'" class="space-y-6">
             <div class="flex justify-between items-center">
               <div>
                 <h2 class="text-2xl font-black text-white italic uppercase">{{ vistaActual === 'ventas_facturas' ? 'Facturación Estándar' : 'Facturación Nacional' }}</h2>
@@ -558,11 +570,13 @@ const formatearFecha = (fechaRaw) => {
             </div>
           </div>
 
-          <!-- VISTA: DEVOLUCIONES -->
-          <div v-if="vistaActual === 'ventas_devoluciones'" class="space-y-6">
+          <!-- VISTA: DEVOLUCIONES (ESTÁNDAR Y NACIONAL) -->
+          <div v-if="vistaActual === 'ventas_devoluciones' || vistaActual === 'ventas_devoluciones_nac'" class="space-y-6">
             <div class="flex justify-between items-center">
               <div>
-                <h2 class="text-2xl font-black text-white italic uppercase">Historial de Devoluciones</h2>
+                <h2 class="text-2xl font-black text-white italic uppercase">
+                  {{ vistaActual === 'ventas_devoluciones' ? 'Historial de Devoluciones' : 'Historial de Devoluciones Nacionales' }}
+                </h2>
                 <p class="text-[10px] text-neutral-500 font-bold uppercase tracking-[0.3em]">Gestión de Notas de Crédito</p>
               </div>
             </div>
@@ -570,7 +584,7 @@ const formatearFecha = (fechaRaw) => {
             <div class="bg-white/5 p-8 rounded-[32px] border border-white/10 space-y-4 shadow-xl">
               <h3 class="text-xs font-black text-brand-royal uppercase italic tracking-widest">Ejecutar Nueva Devolución</h3>
               <div class="flex space-x-4">
-                <input v-model="searchNum" type="text" placeholder="Ej: FAC-0001 o FAN-0001" class="flex-1 bg-brand-navy-dark border border-white/10 rounded-2xl px-6 py-4 text-sm text-white outline-none focus:ring-2 ring-brand-royal transition-all">
+                <input v-model="searchNum" type="text" :placeholder="vistaActual === 'ventas_devoluciones' ? 'Ej: FAC-0001' : 'Ej: FAN-0001'" class="flex-1 bg-brand-navy-dark border border-white/10 rounded-2xl px-6 py-4 text-sm text-white outline-none focus:ring-2 ring-brand-royal transition-all">
                 <button @click="buscarFacturaDevolucion" class="bg-brand-royal px-10 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-brand-royal/80 transition-all">Consultar</button>
               </div>
               
